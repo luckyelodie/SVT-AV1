@@ -310,7 +310,9 @@ static void EncDecConfigureLcu(
     EncDecContext         *context_ptr,
     LargestCodingUnit     *sb_ptr,
     PictureControlSet     *picture_control_set_ptr,
+#if !QPM
     SequenceControlSet    *sequence_control_set_ptr,
+#endif
     uint8_t                    picture_qp,
     uint8_t                    sb_qp)
 {
@@ -1792,7 +1794,7 @@ void* enc_dec_kernel(void *input_ptr)
             reset_mode_decision( // HT done
                 context_ptr->md_context,
                 picture_control_set_ptr,
-                sequence_control_set_ptr,
+                //sequence_control_set_ptr,
                 segment_index);
 
             // Reset EncDec Coding State
@@ -1866,9 +1868,13 @@ void* enc_dec_kernel(void *input_ptr)
                     // Configure the LCU
                     mode_decision_configure_lcu(
                         context_ptr->md_context,
+#if !QPM
                         sb_ptr,
+#endif
                         picture_control_set_ptr,
+#if !QPM
                         sequence_control_set_ptr,
+#endif
                         (uint8_t)context_ptr->qp,
                         (uint8_t)sb_ptr->qp);
 
@@ -1971,7 +1977,9 @@ void* enc_dec_kernel(void *input_ptr)
                         context_ptr,
                         sb_ptr,
                         picture_control_set_ptr,
+#if !QPM
                         sequence_control_set_ptr,
+#endif
                         (uint8_t)context_ptr->qp,
                         (uint8_t)sb_ptr->qp);
 

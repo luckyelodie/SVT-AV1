@@ -282,7 +282,7 @@ extern "C" {
 #if NEW_NEAREST_NEW_INJECTION
         uint32_t                        me_sb_addr;
 #endif
-#if ME_MVP_DEVIATION
+#if FASTER_PREDICTIVE_ME
         uint32_t                        geom_offset_x;
         uint32_t                        geom_offset_y;
 #endif
@@ -402,6 +402,13 @@ extern "C" {
     CAND_CLASS target_class;
 #endif
 #endif
+
+#if RE_FACTURE_PRED_KERNEL
+    EbBool shut_chroma_comp;
+#endif
+#if ESTIMATE_INTRA
+    uint8_t  estimate_angle_intra;
+#endif
   } ModeDecisionContext;
 
     typedef void(*EbAv1LambdaAssignFunc)(
@@ -469,14 +476,18 @@ extern "C" {
     extern void reset_mode_decision(
         ModeDecisionContext   *context_ptr,
         PictureControlSet     *picture_control_set_ptr,
-        SequenceControlSet    *sequence_control_set_ptr,
+        //SequenceControlSet    *sequence_control_set_ptr,
         uint32_t                 segment_index);
 
     extern void mode_decision_configure_lcu(
         ModeDecisionContext   *context_ptr,
+#if !QPM
         LargestCodingUnit     *sb_ptr,
+#endif
         PictureControlSet     *picture_control_set_ptr,
+#if !QPM
         SequenceControlSet    *sequence_control_set_ptr,
+#endif
         uint8_t                  picture_qp,
         uint8_t                  sb_qp);
 
