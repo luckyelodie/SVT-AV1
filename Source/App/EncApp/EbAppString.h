@@ -159,7 +159,7 @@ rsize_t strnlen_ss(
     strcpy_ss(dst, size, src)
 
 #define EB_STRCMP(target,token) \
-    strcmp(target,token)
+    strcmp((const char *)target, (const char *)token)
 
 #define EB_STRLEN(target, max_size) \
     strnlen_ss(target, max_size)
