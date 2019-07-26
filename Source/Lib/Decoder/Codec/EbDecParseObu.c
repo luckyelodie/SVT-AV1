@@ -30,6 +30,8 @@
 #include "EbDecMemInit.h"
 #include "EbDecPicMgr.h"
 
+#include "EbDecParseObuUtil.h"
+
 /*TODO : Should be removed */
 #include "EbDecInverseQuantize.h"
 #include "EbDecProcessFrame.h"
@@ -1257,7 +1259,7 @@ void read_global_motion_params(bitstrm_t *bs, EbDecHandle *dec_handle,
             wm_global->wmtype = cur_buf->global_motion[ref].gm_type;
             memcpy(wm_global->wmmat, cur_buf->global_motion[ref].gm_params,
                 sizeof(cur_buf->global_motion[ref].gm_params));
-            int return_val = get_shear_params(wm_global);
+            int return_val = eb_get_shear_params(wm_global);
             assert(1 == return_val);
             (void)return_val;
         }
@@ -1514,7 +1516,7 @@ int get_qindex(SegmentationParams *seg_params, int segment_id, int base_q_idx)
 EbErrorType reset_parse_ctx(FRAME_CONTEXT *frm_ctx, uint8_t base_qp) {
     EbErrorType return_error = EB_ErrorNone;
 
-    av1_default_coef_probs(frm_ctx, base_qp);
+    eb_av1_default_coef_probs(frm_ctx, base_qp);
     init_mode_probs(frm_ctx);
 
     return return_error;
@@ -2338,7 +2340,7 @@ EbErrorType read_tile_group_obu(bitstrm_t *bs, EbDecHandle *dec_handle_ptr,
         {
             dec_handle_ptr->cur_pic_buf[0]->final_frm_ctx =
                                         parse_ctxt->cur_tile_ctx;
-            av1_reset_cdf_symbol_counters(&dec_handle_ptr->cur_pic_buf[0]->final_frm_ctx);
+            eb_av1_reset_cdf_symbol_counters(&dec_handle_ptr->cur_pic_buf[0]->final_frm_ctx);
         }
 
         dec_bits_init(bs, (uint8_t *)parse_ctxt->r.ec.bptr, obu_header->payload_size);
@@ -2462,4 +2464,41 @@ EbErrorType decode_multiple_obu(EbDecHandle *dec_handle_ptr, uint8_t **data, siz
             frame_decoding_finished = 1;
     }
     return status;
+}
+
+EB_API EbErrorType eb_get_sequence_info(
+    const uint8_t *obu_data,
+    size_t         size,
+    SeqHeader     *sequence_info)
+{
+    if (obu_data == NULL || size == 0 || sequence_info == NULL)
+        return EB_ErrorBadParameter;
+    const uint8_t* frame_buf = obu_data;
+    size_t frame_sz = size;
+    EbErrorType status = EB_ErrorNone;
+    do {
+        bitstrm_t bs;
+        dec_bits_init(&bs, frame_buf, frame_sz);
+
+        ObuHeader ou;
+        memset(&ou, 0, sizeof(ou));
+        size_t length_size = 0;
+        status = open_bistream_unit(&bs, &ou, frame_sz, &length_size);
+        if (status != EB_ErrorNone)
+            return status;
+
+        frame_buf += ou.size + length_size;
+        frame_sz -= (uint32_t)(ou.size + length_size);
+
+        if (ou.obu_type == OBU_SEQUENCE_HEADER) {
+            // check the ou type and parse sequence header
+            status = read_sequence_header_obu(&bs, sequence_info);
+            if (status == EB_ErrorNone)
+                return status;
+        }
+
+        frame_buf += ou.payload_size;
+        frame_sz -= ou.payload_size;
+    } while (status == EB_ErrorNone && frame_sz > 0);
+    return EB_ErrorUndefined;
 }

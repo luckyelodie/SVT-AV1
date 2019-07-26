@@ -2964,7 +2964,7 @@ static INLINE void compute_stats_win7_avx512(const int16_t *const d,
     } while (++i < wiener_win);
 }
 
-void av1_compute_stats_avx512(int32_t wiener_win, const uint8_t *dgd,
+void eb_av1_compute_stats_avx512(int32_t wiener_win, const uint8_t *dgd,
     const uint8_t *src, int32_t h_start, int32_t h_end, int32_t v_start,
     int32_t v_end, int32_t dgd_stride, int32_t src_stride, int64_t *M,
     int64_t *H)
@@ -2983,7 +2983,7 @@ void av1_compute_stats_avx512(int32_t wiener_win, const uint8_t *dgd,
     // (9 / 4) * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX. Enlarge to
     // 3 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX considering
     // paddings.
-    d = aom_memalign(64,
+    d = eb_aom_memalign(64,
         sizeof(*d) * 6 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX);
     s = d + 3 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX;
 
@@ -3013,10 +3013,10 @@ void av1_compute_stats_avx512(int32_t wiener_win, const uint8_t *dgd,
     // We can copy it down to the lower triangle outside the (i, j) loops.
     diagonal_copy_stats_avx2(wiener_win2, H);
 
-    aom_free(d);
+    eb_aom_free(d);
 }
 
-void av1_compute_stats_highbd_avx512(int32_t wiener_win, const uint8_t *dgd8,
+void eb_av1_compute_stats_highbd_avx512(int32_t wiener_win, const uint8_t *dgd8,
     const uint8_t *src8, int32_t h_start, int32_t h_end,
     int32_t v_start, int32_t v_end, int32_t dgd_stride,
     int32_t src_stride, int64_t *M, int64_t *H,
@@ -3038,7 +3038,7 @@ void av1_compute_stats_highbd_avx512(int32_t wiener_win, const uint8_t *dgd8,
     // (9 / 4) * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX. Enlarge to
     // 3 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX considering
     // paddings.
-    d = aom_memalign(64,
+    d = eb_aom_memalign(64,
         sizeof(*d) * 6 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX);
     s = d + 3 * RESTORATION_UNITSIZE_MAX * RESTORATION_UNITSIZE_MAX;
 
@@ -3110,7 +3110,7 @@ void av1_compute_stats_highbd_avx512(int32_t wiener_win, const uint8_t *dgd8,
         div16_diagonal_copy_stats_avx2(wiener_win2, H);
     }
 
-    aom_free(d);
+    eb_aom_free(d);
 }
 
 #endif // !NON_AVX512_SUPPORT
