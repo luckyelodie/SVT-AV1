@@ -591,19 +591,27 @@ TEST(EbRestorationPick_avx2, DISABLED_speed_highbd) {
 #ifndef NON_AVX512_SUPPORT
 
 TEST(EbRestorationPick_avx512, match) {
-    match_test(eb_av1_compute_stats_avx512);
+    if (CanUseIntelAVX512()) {
+        match_test(eb_av1_compute_stats_avx512);
+    }
 }
 
 TEST(EbRestorationPick_avx512, match_highbd) {
-    highbd_match_test(eb_av1_compute_stats_highbd_avx512);
+    if (CanUseIntelAVX512()) {
+        highbd_match_test(eb_av1_compute_stats_highbd_avx512);
+    }
 }
 
 TEST(EbRestorationPick_avx512, DISABLED_speed) {
-    speed_test(eb_av1_compute_stats_avx512);
+    if (CanUseIntelAVX512()) {
+        speed_test(eb_av1_compute_stats_avx512);
+    }
 }
 
 TEST(EbRestorationPick_avx512, DISABLED_speed_highbd) {
-    highbd_speed_test(eb_av1_compute_stats_highbd_avx512);
+    if (CanUseIntelAVX512()) {
+        highbd_speed_test(eb_av1_compute_stats_highbd_avx512);
+    }
 }
 
 #endif
