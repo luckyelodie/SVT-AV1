@@ -134,11 +134,11 @@ static INLINE int32_t CanUseIntelAVX512()
         | (1 << 30)  // AVX-512BW
         | (1 << 31); // AVX-512VL
 
-    // ensure OS supports ZMM registers (and YMM, and XMM)
-    if (!CheckXcr0Zmm())
+    if (!Check4thGenIntelCoreFeatures())
         return 0;
 
-    if (!Check4thGenIntelCoreFeatures())
+    // ensure OS supports ZMM registers (and YMM, and XMM)
+    if (!CheckXcr0Zmm())
         return 0;
 
     RunCpuid(7, 0, abcd);
