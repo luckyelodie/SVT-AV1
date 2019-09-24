@@ -40,12 +40,14 @@ extern "C" {
         }
     };
 
+
     EbEncPack2DType compressed_pack_func_ptr_array[ASM_TYPE_TOTAL] =
     {
         // NON_AVX2
         compressed_packmsb,
         // AVX2
         compressed_packmsb_avx2_intrin,
+
     };
 
     typedef void(*CompPackType)(
@@ -63,6 +65,7 @@ extern "C" {
         c_pack_c,
         // AVX2
         c_pack_avx2_intrin,
+
     };
 
     typedef void(*EbEncUnPack2DType)(
@@ -107,6 +110,7 @@ extern "C" {
         unpack_avg,
         // AVX2
         unpack_avg_avx2_intrin,//unpack_avg_sse2_intrin,
+
     };
 
     typedef void(*EbEncUnpackAvgSubType)(
@@ -126,6 +130,7 @@ extern "C" {
         unpack_avg_safe_sub,
         // AVX2  SafeSub
         unpack_avg_safe_sub_avx2_intrin,//unpack_avg_sse2_intrin,
+
     };
 
     typedef void(*EbEncUnPack8BitDataType)(
@@ -164,6 +169,7 @@ extern "C" {
         un_pack8_bit_data,
         // AVX2
         eb_enc_un_pack8_bit_data_avx2_intrin,
+
     };
 
 #ifdef __cplusplus

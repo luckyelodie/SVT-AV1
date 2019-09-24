@@ -55,3 +55,4 @@ EB_ALIGN(16) const int16_t intra_prediction_const_sse2[344] = {
     31, 31, 31, 31, 31, 31, 31, 31,
     32, 32, 32, 32, 32, 32, 32, 32,
 };
+

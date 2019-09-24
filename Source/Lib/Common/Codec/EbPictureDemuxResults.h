@@ -7,19 +7,15 @@
 #define EbPictureResults_h
 
 #include "EbSystemResourceManager.h"
-#include "EbObject.h"
 
 /**************************************
  * Enums
  **************************************/
-typedef enum EbPicType
+typedef enum EbPicType 
 {
     EB_PIC_INVALID = 0,
     EB_PIC_INPUT = 1,
     EB_PIC_REFERENCE = 2
-#if ENABLE_CDF_UPDATE
-    , EB_PIC_FEEDBACK = 3
-#endif
 } EbPicType;
 
 /**************************************
@@ -27,7 +23,6 @@ typedef enum EbPicType
  **************************************/
 typedef struct PictureDemuxResults
 {
-    EbDctor                      dctor;
     EbPicType                    picture_type;
 
     // Only valid for input pictures
@@ -37,6 +32,7 @@ typedef struct PictureDemuxResults
     EbObjectWrapper             *reference_picture_wrapper_ptr;
     EbObjectWrapper             *sequence_control_set_wrapper_ptr;
     uint64_t                     picture_number;
+
 } PictureDemuxResults;
 
 typedef struct PictureResultInitData {
@@ -46,8 +42,9 @@ typedef struct PictureResultInitData {
 /**************************************
  * Extern Function Declarations
  **************************************/
-extern EbErrorType picture_results_creator(
+extern EbErrorType picture_results_ctor(
     EbPtr *object_dbl_ptr,
     EbPtr  object_init_data_ptr);
+
 
 #endif //EbPictureResults_h

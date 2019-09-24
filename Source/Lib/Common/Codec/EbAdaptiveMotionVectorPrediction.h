@@ -21,14 +21,14 @@ extern "C" {
     struct ModeDecisionContext;
     struct InterPredictionContext;
 
-    typedef enum TmvpPos
+    typedef enum TmvpPos 
     {
         TmvpColocatedBottomRight = 0,
         TmvpColocatedCenter = 1
     } TmvpPos;
 
     // TMVP items corresponding to one LCU
-    typedef struct TmvpUnit
+    typedef struct TmvpUnit 
     {
         Mv              mv[MAX_NUM_OF_REF_PIC_LIST][MAX_TMVP_CAND_PER_LCU];
         uint64_t            ref_pic_poc[MAX_NUM_OF_REF_PIC_LIST][MAX_TMVP_CAND_PER_LCU];
@@ -36,6 +36,7 @@ extern "C" {
         EbBool              availability_flag[MAX_TMVP_CAND_PER_LCU];
 
         //*Note- list 1 motion info will be added when B-slices are ready
+
     } TmvpUnit;
 
     extern EbErrorType clip_mv(
@@ -121,6 +122,7 @@ extern "C" {
         EbWarpedMotionParams             *wm_params,
         uint16_t                         *num_samples);
 
+
     static INLINE EbBool is_motion_variation_allowed_bsize(const BlockSize bsize)
     {
         return (block_size_wide[bsize] >= 8 && block_size_high[bsize] >= 8);
@@ -137,14 +139,14 @@ extern "C" {
              || cu_ptr->prediction_unit_array[0].overlappable_neighbors[1] != 0);
     }
 
-    void eb_av1_count_overlappable_neighbors(
+    void av1_count_overlappable_neighbors(
         const PictureControlSet        *picture_control_set_ptr,
         CodingUnit                     *cu_ptr,
         const BlockSize                   bsize,
         int32_t                           mi_row,
         int32_t                           mi_col);
 
-    void eb_av1_find_best_ref_mvs_from_stack(int allow_hp,
+    void av1_find_best_ref_mvs_from_stack(int allow_hp,
         CandidateMv ref_mv_stack[][MAX_REF_MV_STACK_SIZE],
         MacroBlockD * xd,
         MvReferenceFrame ref_frame,

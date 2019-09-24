@@ -20,6 +20,7 @@
 extern "C" {
 #endif // __cplusplus
 
+
 /*!\brief List of supported color primaries */
 typedef enum EbColorPrimaries {
     EB_CICP_CP_RESERVED_0 = 0,  /**< For future use */
@@ -108,7 +109,7 @@ typedef enum EbColorRange {
 typedef enum EbBitDepth {
     EB_EIGHT_BIT = 8,
     EB_TEN_BIT  = 10,
-    EB_TWELVE_BIT = 12
+    EB_TWELVE_BIT = 12    
 } EbBitDepth;
 
 /* AV1 Chroma Format */
@@ -127,6 +128,7 @@ typedef enum EbChromaSamplePosition {
     EB_CSP_COLOCATED = 2,        /**< Co-located with luma(0, 0) sample */
     EB_CSP_RESERVED = 3          /**< Reserved value */
 } EbChromaSamplePosition; /**< alias for enum aom_transfer_function */
+
 
 #ifdef __cplusplus
 }

@@ -60,6 +60,7 @@ void compressed_packmsb(
     {
         for (kIdx = 0; kIdx < width / 4; kIdx++)
         {
+
             four2bitPels = inn_bit_buffer[kIdx + row * inn_stride];
 
             nBitPixel = (four2bitPels >> 6) & 3;
@@ -78,6 +79,8 @@ void compressed_packmsb(
             nBitPixel = (four2bitPels >> 0) & 3;
             outPixel = in8_bit_buffer[kIdx * 4 + 3 + row * in8_stride] << 2;
             out16_bit_buffer[kIdx * 4 + 3 + row * out_stride] = outPixel | nBitPixel;
+
+
         }
     }
 }
@@ -114,7 +117,9 @@ void c_pack_c(
             in_compn_bit_buffer[j] = compressedUnpackedPixel;
         }
     }
+
 }
+
 
 /************************************************
 * unpack 10 bit data into  8 and 2 bit 2D data
@@ -142,6 +147,7 @@ void eb_enc_msb_un_pack2_d(
             outn_bit_buffer[k + j * outn_stride] = tmpPixel;
         }
     }
+
 }
 void un_pack8_bit_data(
     uint16_t      *in16_bit_buffer,
@@ -164,6 +170,7 @@ void un_pack8_bit_data(
             //outn_bit_buffer[k + j*outn_stride] = tmpPixel;
         }
     }
+
 }
 void unpack_avg(
     uint16_t *ref16_l0,
@@ -175,6 +182,7 @@ void unpack_avg(
     uint32_t  width,
     uint32_t  height)
 {
+
     uint64_t   j, k;
     uint8_t   inPixelL0, inPixelL1;
 
@@ -185,8 +193,11 @@ void unpack_avg(
             inPixelL0 = (uint8_t)(ref16_l0[k + j * ref_l0_stride] >> 2);
             inPixelL1 = (uint8_t)(ref16_l1[k + j * ref_l1_stride] >> 2);
             dst_ptr[k + j * dst_stride] = (inPixelL0 + inPixelL1 + 1) >> 1;
+
         }
     }
+
+
 }
 
 void unpack_avg_safe_sub(
@@ -200,6 +211,7 @@ void unpack_avg_safe_sub(
     uint32_t  width,
     uint32_t  height)
 {
+
     uint64_t   j, k;
     uint8_t   inPixelL0, inPixelL1;
 
@@ -210,6 +222,7 @@ void unpack_avg_safe_sub(
             inPixelL0 = (uint8_t)(ref16_l0[k + j * ref_l0_stride] >> 2);
             inPixelL1 = (uint8_t)(ref16_l1[k + j * ref_l1_stride] >> 2);
             dst_ptr[k + j * dst_stride] = (inPixelL0 + inPixelL1 + 1) >> 1;
+
         }
     }
 
@@ -221,6 +234,9 @@ void unpack_avg_safe_sub(
             inPixelL0 = (uint8_t)(ref16_l0[k + j * ref_l0_stride / 2] >> 2);
             inPixelL1 = (uint8_t)(ref16_l1[k + j * ref_l1_stride / 2] >> 2);
             dst_ptr[k + j * dst_stride / 2] = (inPixelL0 + inPixelL1 + 1) >> 1;
+
         }
+
     }
+
 }

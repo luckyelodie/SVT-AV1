@@ -14,13 +14,12 @@
 #include "EbUtility.h"
 #include "EbPsnr.h"
 #include "EbPictureControlSet.h"
-#include "EbObject.h"
+
 /**************************************
  * Cdef Context
  **************************************/
 typedef struct CdefContext_s
 {
-    EbDctor                       dctor;
     EbFifo                       *cdef_input_fifo_ptr;
     EbFifo                       *cdef_output_fifo_ptr;
 } CdefContext_t;
@@ -29,7 +28,7 @@ typedef struct CdefContext_s
  * Extern Function Declarations
  **************************************/
 extern EbErrorType cdef_context_ctor(
-    CdefContext_t           *context_ptr,
+    CdefContext_t **context_dbl_ptr,
     EbFifo                       *cdef_input_fifo_ptr,
     EbFifo                       *cdef_output_fifo_ptr,
     EbBool                  is16bit,

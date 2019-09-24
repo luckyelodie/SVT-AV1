@@ -18,6 +18,7 @@
 #include "synonyms.h"
 #include "synonyms_avx2.h"
 
+
 DECLARE_ALIGNED(32, static const uint8_t, filt_center_global_avx2[32]) = {
   3, 255, 4, 255, 5, 255, 6, 255, 7, 255, 8, 255, 9, 255, 10, 255,
   3, 255, 4, 255, 5, 255, 6, 255, 7, 255, 8, 255, 9, 255, 10, 255
@@ -102,7 +103,7 @@ static INLINE __m256i convolve(const __m256i *const s,
 // the centre pixel by 2^(FILTER_BITS - round_0) and add it to get the
 // horizontal filter output.
 
-void eb_av1_wiener_convolve_add_src_avx2(const uint8_t *src, ptrdiff_t src_stride,
+void av1_wiener_convolve_add_src_avx2(const uint8_t *src, ptrdiff_t src_stride,
     uint8_t *dst, ptrdiff_t dst_stride,
     const int16_t *filter_x, int32_t x_step_q4,
     const int16_t *filter_y, int32_t y_step_q4,
@@ -298,7 +299,7 @@ void eb_av1_wiener_convolve_add_src_avx2(const uint8_t *src, ptrdiff_t src_strid
 // on the left.
 // A row of, say, 16-bit pixels with values p0, p1, p2, ..., p14, p15 will be
 // loaded and stored as [ p15 ... p9 p8 ][ p7 ... p1 p0 ].
-void eb_av1_highbd_wiener_convolve_add_src_avx2(
+void av1_highbd_wiener_convolve_add_src_avx2(
     const uint8_t *src8, ptrdiff_t src_stride, uint8_t *dst8,
     ptrdiff_t dst_stride, const int16_t *filter_x, int32_t x_step_q4,
     const int16_t *filter_y, int32_t y_step_q4, int32_t w, int32_t h,
@@ -516,3 +517,6 @@ void eb_av1_highbd_wiener_convolve_add_src_avx2(
         }
     }
 }
+
+
+

@@ -1,7 +1,6 @@
 # Scalable Video Technology for AV1 Decoder (SVT-AV1 Decoder) User Guide
 
 ## Table of Contents
-
 1. [Introduction](#introduction)
 2. [Known Limitations](#known-limitations)
 3. [Sample Application Guide](#sample-application-guide)
@@ -15,11 +14,9 @@ This document describes how to use the Scalable Video Technology for AV1 Decoder
 ## Known Limitations
 
 Initial version:
-
-- Supports all frames without loopfilter (deblocking, cdef and self guided restoration filters not supported)
-- Screen content tools are not supported
-- Following Inter tools are not supported : (OBMC, COMPOUND_INTRA, COMPOUND_DISTANCE, COMPOUND_WEDGE, COMPOUND_DIFFWTD, Temporal Scan)
-- Supports only 8-bit and 10-bit 4:2:0 content
+- Supports only I-frames without loopfilter (deblocking, cdef and self guided restoration filters not supported)
+- Tiles not supported
+- Supports only 8-bit 4:2:0 content
 - Tested only on Windows
 
 ## Sample Application Guide
@@ -28,36 +25,35 @@ This section describes how to run the sample decoder application that uses the S
 
 ### Running the decoder
 
-This section describes how to run the sample decoder application `SvtAv1DecApp.exe` (on Windows\*) or `SvtAv1DecApp` (on Linux\*) from the command line, including descriptions of the most commonly used input parameters and outputs.
+This section describes how to run the sample decoder application SvtAv1DecApp.exe (on Windows\*) or SvtAv1DecApp (on Linux\*) from the command line, including descriptions of the most commonly used input parameters and outputs.
 
 The sample application typically takes the following command line parameters:
 
-``` none
+```
 -help                     Show usage options and exit
 -i <arg>                  Input file name
 -o <arg>                  Output file name
 -skip <arg>               Skip the first n input frames
 -limit <arg>              Stop decoding after n frames
--bit-depth <arg>          Input bitdepth. [8, 10, 12]
+-bit-depth <arg>          Input bitdepth. [400, 420, 422, 444]
 -w <arg>                  Input picture width
 -h <arg>                  Input picture height
--colour-space <arg>       Input picture colour space. [400, 420, 422, 444]
+-colour-space <arg>       Input picture colour space
 -md5                      MD5 support flag
 ```
 
-Sample usage: `SvtAv1DecApp.exe -i test.ivf -o out.yuv`
+Sample usage 
+`SvtAv1DecApp.exe -i test.ivf -o out.yuv`
 
 #### List of all configuration parameters
 
-- _WIP_
+_WIP_
 
 ## Legal Disclaimer
 
-### Optimization Notice
+Optimization Notice: Intel compilers may or may not optimize to the same degree for non-Intel microprocessors for optimizations that are not unique to Intel microprocessors. These optimizations include SSE2, SSE3, and SSSE3 instruction sets and other optimizations. Intel does not guarantee the availability, functionality, or effectiveness of any optimization on microprocessors not manufactured by Intel. Microprocessor-dependent optimizations in this product are intended for use with Intel microprocessors. Certain optimizations not specific to Intel microarchitecture are reserved for Intel microprocessors. Please refer to the applicable product User and Reference Guides for more information regarding the specific instruction sets covered by this notice.
 
-Intel compilers may or may not optimize to the same degree for non-Intel microprocessors for optimizations that are not unique to Intel microprocessors. These optimizations include SSE2, SSE3, and SSSE3 instruction sets and other optimizations. Intel does not guarantee the availability, functionality, or effectiveness of any optimization on microprocessors not manufactured by Intel. Microprocessor-dependent optimizations in this product are intended for use with Intel microprocessors. Certain optimizations not specific to Intel microarchitecture are reserved for Intel microprocessors. Please refer to the applicable product User and Reference Guides for more information regarding the specific instruction sets covered by this notice.
-
-### Notice Revision #20110804
+Notice Revision #20110804
 
 Intel technologies features and benefits depend on system configuration and may require enabled hardware, software or service activation. Performance varies depending on system configuration. No computer system can be absolutely secure. Check with your system manufacturer or retailer.
 

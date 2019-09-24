@@ -16,7 +16,8 @@
 
 #include "EbDefinitions.h"
 #include "av1_txfm1d_sse4.h"
-#include "EbTransforms.h"
+
+const int32_t *cospi_arr(int32_t n);
 
 void av1_fdct32_new_sse4_1(const __m128i *input, __m128i *output,
     int8_t cos_bit) {

@@ -8,7 +8,6 @@
 
 #include "EbDefinitions.h"
 #include "EbUtility.h"
-#include "EbObject.h"
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
@@ -20,9 +19,8 @@ extern "C" {
 /**********************************
  * Bitstream Unit Types
  **********************************/
-    typedef struct OutputBitstreamUnit
+    typedef struct OutputBitstreamUnit 
     {
-        EbDctor   dctor;
         uint32_t  size;                               // allocated buffer size
         uint32_t  written_bits_count;                   // count of written bits
         uint8_t  *buffer_begin_av1;                        // the byte buffer
@@ -166,7 +164,7 @@ The 0* term provides compile-time type checking */
 on a larger type, you can speed up the decoder by using it here.*/
     typedef uint32_t od_ec_window;
 
-#define OD_EC_WINDOW_SIZE ((int32_t)sizeof(od_ec_window) * CHAR_BIT)
+//#define OD_EC_WINDOW_SIZE ((int32_t)sizeof(od_ec_window) * CHAR_BIT)
 
     /*The resolution of fractional-precision bit usage measurements, i.e.,
     3 => 1/8th bits.*/
@@ -176,7 +174,7 @@ on a larger type, you can speed up the decoder by using it here.*/
 
     /*See entcode.c for further documentation.*/
 
-    OD_WARN_UNUSED_RESULT uint32_t eb_od_ec_tell_frac(uint32_t nbits_total,
+    OD_WARN_UNUSED_RESULT uint32_t od_ec_tell_frac(uint32_t nbits_total,
         uint32_t rng);
 
     /********************************************************************************************************************************/
@@ -186,10 +184,10 @@ on a larger type, you can speed up the decoder by using it here.*/
 #define OD_MEASURE_EC_OVERHEAD (0)
 
     /*The entropy encoder context.*/
-    struct OdEcEnc
+    struct OdEcEnc 
     {
         /*Buffered output.
-        This contains only the raw bits until the final call to eb_od_ec_enc_done(),
+        This contains only the raw bits until the final call to od_ec_enc_done(),
         where all the arithmetic-coded data gets prepended to it.*/
         uint8_t *buf;
         /*The size of the buffer.*/
@@ -218,27 +216,28 @@ on a larger type, you can speed up the decoder by using it here.*/
 
     /*See entenc.c for further documentation.*/
 
-    void eb_od_ec_enc_init(OdEcEnc *enc, uint32_t size) OD_ARG_NONNULL(1);
-    void eb_od_ec_enc_reset(OdEcEnc *enc) OD_ARG_NONNULL(1);
-    void eb_od_ec_enc_clear(OdEcEnc *enc) OD_ARG_NONNULL(1);
+    void od_ec_enc_init(OdEcEnc *enc, uint32_t size) OD_ARG_NONNULL(1);
+    void od_ec_enc_reset(OdEcEnc *enc) OD_ARG_NONNULL(1);
+    void od_ec_enc_clear(OdEcEnc *enc) OD_ARG_NONNULL(1);
 
-    void eb_od_ec_encode_bool_q15(OdEcEnc *enc, int32_t val, unsigned f_q15)
+    void od_ec_encode_bool_q15(OdEcEnc *enc, int32_t val, unsigned f_q15)
         OD_ARG_NONNULL(1);
-    void eb_od_ec_encode_cdf_q15(OdEcEnc *enc, int32_t s, const uint16_t *cdf, int32_t nsyms)
+    void od_ec_encode_cdf_q15(OdEcEnc *enc, int32_t s, const uint16_t *cdf, int32_t nsyms)
         OD_ARG_NONNULL(1) OD_ARG_NONNULL(3);
 
     void od_ec_enc_bits(OdEcEnc *enc, uint32_t fl, unsigned ftb)
         OD_ARG_NONNULL(1);
 
-    OD_WARN_UNUSED_RESULT uint8_t *eb_od_ec_enc_done(OdEcEnc *enc,
+    OD_WARN_UNUSED_RESULT uint8_t *od_ec_enc_done(OdEcEnc *enc,
         uint32_t *nbytes)
         OD_ARG_NONNULL(1) OD_ARG_NONNULL(2);
 
-    OD_WARN_UNUSED_RESULT int32_t eb_od_ec_enc_tell(const OdEcEnc *enc)
+    OD_WARN_UNUSED_RESULT int32_t od_ec_enc_tell(const OdEcEnc *enc)
         OD_ARG_NONNULL(1);
 
-    void eb_od_ec_enc_checkpoint(OdEcEnc *dst, const OdEcEnc *src);
-    void eb_od_ec_enc_rollback(OdEcEnc *dst, const OdEcEnc *src);
+
+    void od_ec_enc_checkpoint(OdEcEnc *dst, const OdEcEnc *src);
+    void od_ec_enc_rollback(OdEcEnc *dst, const OdEcEnc *src);
 
     /********************************************************************************************************************************/
     //daalaboolwriter.h
@@ -251,8 +250,8 @@ on a larger type, you can speed up the decoder by using it here.*/
 
     typedef struct DaalaWriter DaalaWriter;
 
-    void eb_aom_daala_start_encode(DaalaWriter *w, uint8_t *buffer);
-    int32_t eb_aom_daala_stop_encode(DaalaWriter *w);
+    void aom_daala_start_encode(DaalaWriter *w, uint8_t *buffer);
+    int32_t aom_daala_stop_encode(DaalaWriter *w);
 
     static INLINE void aom_daala_write(DaalaWriter *w, int32_t bit, int32_t prob) {
         int32_t p = (0x7FFFFF - (prob << 15) + prob) >> 8;
@@ -260,7 +259,7 @@ on a larger type, you can speed up the decoder by using it here.*/
         AomCdfProb cdf[2] = { (AomCdfProb)p, 32767 };
         bitstream_queue_push(bit, cdf, 2);
 #endif
-        eb_od_ec_encode_bool_q15(&w->ec, bit, p);
+        od_ec_encode_bool_q15(&w->ec, bit, p);
     }
 
     static INLINE void daala_write_symbol(DaalaWriter *w, int32_t symb,
@@ -268,14 +267,14 @@ on a larger type, you can speed up the decoder by using it here.*/
 #if CONFIG_BITSTREAM_DEBUG
         bitstream_queue_push(symb, cdf, nsymbs);
 #endif
-        eb_od_ec_encode_cdf_q15(&w->ec, symb, cdf, nsymbs);
+        od_ec_encode_cdf_q15(&w->ec, symb, cdf, nsymbs);
     }
 
     /********************************************************************************************************************************/
     // bitwriter.h
     typedef struct DaalaWriter AomWriter;
 
-    typedef struct TokenStats
+    typedef struct TokenStats 
     {
         int32_t cost;
 #if CONFIG_RD_DEBUG
@@ -287,19 +286,20 @@ on a larger type, you can speed up the decoder by using it here.*/
 #if CONFIG_RD_DEBUG
         int32_t r, c;
         for (r = 0; r < TXB_COEFF_COST_MAP_SIZE; ++r) {
-            for (c = 0; c < TXB_COEFF_COST_MAP_SIZE; ++c)
+            for (c = 0; c < TXB_COEFF_COST_MAP_SIZE; ++c) {
                 token_stats->txb_coeff_cost_map[r][c] = 0;
+            }
         }
 #endif
         token_stats->cost = 0;
     }
 
     static INLINE void aom_start_encode(AomWriter *bc, uint8_t *buffer) {
-        eb_aom_daala_start_encode(bc, buffer);
+        aom_daala_start_encode(bc, buffer);
     }
 
     static INLINE int32_t aom_stop_encode(AomWriter *bc) {
-        return eb_aom_daala_stop_encode(bc);
+        return aom_daala_stop_encode(bc);
     }
 
     static INLINE void aom_write(AomWriter *br, int32_t bit, int32_t probability) {
@@ -326,6 +326,7 @@ on a larger type, you can speed up the decoder by using it here.*/
         aom_write_cdf(w, symb, cdf, nsymbs);
         if (w->allow_update_cdf) update_cdf(cdf, symb, nsymbs);
     }
+
 
     /********************************************************************************************************************************/
     /********************************************************************************************************************************/

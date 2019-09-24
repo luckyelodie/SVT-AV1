@@ -46,6 +46,7 @@ extern "C" {
 
 #define WARPEDDIFF_PREC_BITS (WARPEDMODEL_PREC_BITS - WARPEDPIXEL_PREC_BITS)
 
+
 #define MAX_PARAMDIM 9
 #define LEAST_SQUARES_SAMPLES_MAX_BITS 3
 #define LEAST_SQUARES_SAMPLES_MAX (1 << LEAST_SQUARES_SAMPLES_MAX_BITS)
@@ -53,10 +54,9 @@ extern "C" {
 #define WARPED_MOTION_DEBUG 0
 #define DEFAULT_WMTYPE AFFINE
 
-extern const int16_t eb_warped_filter[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8];
-extern const int error_measure_lut[512];
+extern const int16_t warped_filter[WARPEDPIXEL_PREC_SHIFTS * 3 + 1][8];
 
-EB_ALIGN(16) static const uint8_t warp_pad_left[14][16] = {
+static const uint8_t warp_pad_left[14][16] = {
   { 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
   { 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
   { 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
@@ -73,7 +73,7 @@ EB_ALIGN(16) static const uint8_t warp_pad_left[14][16] = {
   { 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15 },
 };
 
-EB_ALIGN(16) static const uint8_t warp_pad_right[14][16] = {
+static const uint8_t warp_pad_right[14][16] = {
   { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14 },
   { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 13 },
   { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 12, 12, 12 },
@@ -90,13 +90,9 @@ EB_ALIGN(16) static const uint8_t warp_pad_right[14][16] = {
   { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }
 };
 
-static INLINE int error_measure(int err) {
-    return error_measure_lut[255 + err];
-}
-
 // Returns the error between the result of applying motion 'wm' to the frame
 // described by 'ref' and the frame described by 'dst'.
-int64_t eb_av1_warp_error(
+int64_t av1_warp_error(
     EbWarpedMotionParams *wm,
     int            use_hbd,
     int            bd,
@@ -116,7 +112,7 @@ int64_t eb_av1_warp_error(
 
 // Returns the error between the frame described by 'ref' and the frame
 // described by 'dst'.
-int64_t eb_av1_frame_error(
+int64_t av1_frame_error(
     int            use_hbd,
     int            bd,
     const uint8_t *ref,
@@ -126,7 +122,7 @@ int64_t eb_av1_frame_error(
     int            p_height,
     int            p_stride);
 
-void eb_av1_warp_plane(
+void av1_warp_plane(
     EbWarpedMotionParams *wm,
     int             use_hbd,
     int             bd,
@@ -161,7 +157,7 @@ void av1_warp_plane_hbd(
     int             subsampling_y,
     ConvolveParams *conv_params);
 
-EbBool eb_find_projection(
+EbBool find_projection(
     int        np,
     int       *pts1,
     int       *pts2,
@@ -172,7 +168,7 @@ EbBool eb_find_projection(
     int        mi_row,
     int        mi_col);
 
-int eb_get_shear_params(EbWarpedMotionParams *wm);
+int get_shear_params(EbWarpedMotionParams *wm);
 
 #ifdef __cplusplus
 }

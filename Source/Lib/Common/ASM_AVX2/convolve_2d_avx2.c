@@ -16,7 +16,7 @@
 #include "convolve_avx2.h"
 #include "synonyms.h"
 
-void eb_av1_convolve_2d_sr_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst,
+void av1_convolve_2d_sr_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst,
     int32_t dst_stride, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,
@@ -174,7 +174,7 @@ static INLINE void copy_128(const uint8_t *src, uint8_t *dst) {
     _mm256_storeu_si256((__m256i *)(dst + 3 * 32), s[3]);
 }
 
-void eb_av1_convolve_2d_copy_sr_avx2(const uint8_t *src, int32_t src_stride,
+void av1_convolve_2d_copy_sr_avx2(const uint8_t *src, int32_t src_stride,
     uint8_t *dst, int32_t dst_stride, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,
@@ -185,6 +185,7 @@ void eb_av1_convolve_2d_copy_sr_avx2(const uint8_t *src, int32_t src_stride,
     (void)subpel_x_q4;
     (void)subpel_y_q4;
     (void)conv_params;
+
 
     if (w == 2) {
         do {
