@@ -49,7 +49,6 @@ static INLINE int32_t highbd_vert_scalar_product(const uint16_t *a,
     return sum;
 }
 
-
 static const InterpKernel *get_filter_base(const int16_t *filter) {
     // NOTE: This assumes that the filter table is 256-byte aligned.
     // TODO(agrange) Modify to make independent of table alignment.
@@ -59,7 +58,6 @@ static const InterpKernel *get_filter_base(const int16_t *filter) {
 static int32_t get_filter_offset(const int16_t *f, const InterpKernel *base) {
     return (int32_t)((const InterpKernel *)(intptr_t)f - base);
 }
-
 
 static void convolve_add_src_horiz_hip(const uint8_t *src, ptrdiff_t src_stride,
     uint16_t *dst, ptrdiff_t dst_stride,
@@ -112,7 +110,7 @@ static void convolve_add_src_vert_hip(const uint16_t *src, ptrdiff_t src_stride,
     }
 }
 
-void av1_wiener_convolve_add_src_c(const uint8_t *src, ptrdiff_t src_stride,
+void eb_av1_wiener_convolve_add_src_c(const uint8_t *src, ptrdiff_t src_stride,
     uint8_t *dst, ptrdiff_t dst_stride,
     const int16_t *filter_x, int32_t x_step_q4,
     const int16_t *filter_y, int32_t y_step_q4,
@@ -191,7 +189,7 @@ static void highbd_convolve_add_src_vert_hip(
     }
 }
 
-void av1_highbd_wiener_convolve_add_src_c(
+void eb_av1_highbd_wiener_convolve_add_src_c(
     const uint8_t *src, ptrdiff_t src_stride, uint8_t *dst,
     ptrdiff_t dst_stride, const int16_t *filter_x, int32_t x_step_q4,
     const int16_t *filter_y, int32_t y_step_q4, int32_t w, int32_t h,
@@ -220,4 +218,3 @@ void av1_highbd_wiener_convolve_add_src_c(
         temp + MAX_SB_SIZE * (SUBPEL_TAPS / 2 - 1), MAX_SB_SIZE, dst, dst_stride,
         filters_y, y0_q4, y_step_q4, w, h, conv_params->round_1, bd);
 }
-

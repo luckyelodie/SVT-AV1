@@ -130,7 +130,6 @@ static INLINE void variance32_kernel_no_sum_avx2(const uint8_t *const src,
 static INLINE void variance16_no_sum_avx2(const uint8_t *src,
     const int32_t src_stride, const uint8_t *ref, const int32_t ref_stride,
     const int32_t h, __m256i *const vsse) {
-
     for (int32_t i = 0; i < h; i += 2) {
         variance16_kernel_no_sum_avx2(src, src_stride, ref, ref_stride, vsse);
         src += 2 * src_stride;
@@ -141,7 +140,6 @@ static INLINE void variance16_no_sum_avx2(const uint8_t *src,
 static INLINE void variance32_no_sum_avx2(const uint8_t *src, const int32_t src_stride,
     const uint8_t *ref, const int32_t ref_stride,
     const int32_t h, __m256i *const vsse) {
-
     for (int32_t i = 0; i < h; i++) {
         variance32_kernel_no_sum_avx2(src, ref, vsse);
         src += src_stride;
@@ -152,7 +150,6 @@ static INLINE void variance32_no_sum_avx2(const uint8_t *src, const int32_t src_
 static INLINE void variance64_no_sum_avx2(const uint8_t *src, const int32_t src_stride,
     const uint8_t *ref, const int32_t ref_stride,
     const int32_t h, __m256i *const vsse) {
-
     for (int32_t i = 0; i < h; i++) {
         variance32_kernel_no_sum_avx2(src + 0, ref + 0, vsse);
         variance32_kernel_no_sum_avx2(src + 32, ref + 32, vsse);
@@ -164,7 +161,6 @@ static INLINE void variance64_no_sum_avx2(const uint8_t *src, const int32_t src_
 static INLINE void variance128_no_sum_avx2(const uint8_t *src, const int32_t src_stride,
     const uint8_t *ref, const int32_t ref_stride,
     const int32_t h, __m256i *const vsse) {
-
     for (int32_t i = 0; i < h; i++) {
         variance32_kernel_no_sum_avx2(src + 0, ref + 0, vsse);
         variance32_kernel_no_sum_avx2(src + 32, ref + 32, vsse);
@@ -176,7 +172,7 @@ static INLINE void variance128_no_sum_avx2(const uint8_t *src, const int32_t src
 }
 
 #define AOM_VAR_NO_LOOP_NO_SUM_AVX2(bw, bh, bits, max_pixel)                         \
-  void aom_variance##bw##x##bh##_no_sum_avx2(                                \
+  void eb_aom_variance##bw##x##bh##_no_sum_avx2(                                \
       const uint8_t *src, int32_t src_stride, const uint8_t *ref, int32_t ref_stride, \
       uint32_t *sse) {                                                    \
     __m256i vsse = _mm256_setzero_si256();                                    \
@@ -186,10 +182,10 @@ static INLINE void variance128_no_sum_avx2(const uint8_t *src, const int32_t src
 
 AOM_VAR_NO_LOOP_NO_SUM_AVX2(16, 16, 8, 512);
 
-uint32_t aom_mse16x16_avx2(const uint8_t *src, int32_t src_stride,
+uint32_t eb_aom_mse16x16_avx2(const uint8_t *src, int32_t src_stride,
     const uint8_t *ref, int32_t ref_stride,
     uint32_t *sse) {
-    aom_variance16x16_no_sum_avx2(src, src_stride, ref, ref_stride, sse);
+    eb_aom_variance16x16_no_sum_avx2(src, src_stride, ref, ref_stride, sse);
     return *sse;
 }
 
@@ -273,10 +269,8 @@ void highbd_variance64_avx2(const uint8_t *a8, int32_t a_stride,
         variance_final_from_32bit_no_sum_avx2(vsse, &tsse);
         *sse = tsse;
     }
-    else {
+    else
         highbd_variance64_c(a, a_stride, b, b_stride, w, h, sse);
-    }
-
 #ifdef _WIN32
     // Add this redundant instruction to fix a Visual Studio compiler bug, which
     // falsely loads 64-bit intermediate result into *sse in
@@ -430,7 +424,7 @@ static INLINE void variance128_avx2(const uint8_t *src, const int src_stride,
 }
 
 #define AOM_VAR_NO_LOOP_AVX2(bw, bh, bits, max_pixel)                         \
-  unsigned int aom_variance##bw##x##bh##_avx2(                                \
+  unsigned int eb_aom_variance##bw##x##bh##_avx2(                                \
       const uint8_t *src, int src_stride, const uint8_t *ref, int ref_stride, \
       unsigned int *sse) {                                                    \
     __m256i vsse = _mm256_setzero_si256();                                    \
@@ -455,7 +449,7 @@ AOM_VAR_NO_LOOP_AVX2(64, 16, 10, 1024);
 AOM_VAR_NO_LOOP_AVX2(64, 32, 11, 2048);
 
 #define AOM_VAR_LOOP_AVX2(bw, bh, bits, uh)                                   \
-  unsigned int aom_variance##bw##x##bh##_avx2(                                \
+  unsigned int eb_aom_variance##bw##x##bh##_avx2(                                \
       const uint8_t *src, int src_stride, const uint8_t *ref, int ref_stride, \
       unsigned int *sse) {                                                    \
     __m256i vsse = _mm256_setzero_si256();                                    \
@@ -477,4 +471,3 @@ AOM_VAR_LOOP_AVX2(64, 64, 12, 32);    // 64x32 * ( 64/32)
 AOM_VAR_LOOP_AVX2(64, 128, 13, 32);   // 64x32 * (128/32)
 AOM_VAR_LOOP_AVX2(128, 64, 13, 16);   // 128x16 * ( 64/16)
 AOM_VAR_LOOP_AVX2(128, 128, 14, 16);  // 128x16 * (128/16)
-

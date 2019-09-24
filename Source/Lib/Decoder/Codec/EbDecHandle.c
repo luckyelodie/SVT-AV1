@@ -17,6 +17,7 @@
 #include "EbSvtAv1Dec.h"
 #include "EbDecHandle.h"
 #include "EbDecMemInit.h"
+#include "EbDecPicMgr.h"
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <pthread.h>
@@ -47,10 +48,11 @@ uint32_t                         lib_malloc_count = 0;
 uint32_t                         lib_semaphore_count = 0;
 uint32_t                         lib_mutex_count = 0;
 
+void asmSetConvolveAsmTable(void);
 void init_intra_dc_predictors_c_internal(void);
 void init_intra_predictors_internal(void);
-EbErrorType decode_multiple_obu(EbDecHandle *dec_handle_ptr, 
-            const uint8_t *data, uint32_t data_size);
+EbErrorType decode_multiple_obu(EbDecHandle *dec_handle_ptr,
+                                uint8_t **data, size_t data_size);
 
 void SwitchToRealTime(){
 #if defined(__linux__) || defined(__APPLE__)
@@ -78,20 +80,13 @@ static EbErrorType eb_dec_handle_ctor(
     // Allocate Memory
     EbDecHandle   *dec_handle_ptr = (EbDecHandle  *)malloc(sizeof(EbDecHandle  ));
     *decHandleDblPtr = dec_handle_ptr;
-    if (dec_handle_ptr == (EbDecHandle  *)EB_NULL) {
+    if (dec_handle_ptr == (EbDecHandle  *)EB_NULL)
         return EB_ErrorInsufficientResources;
-    }
-#if MEM_MAP_OPT
     dec_handle_ptr->memory_map = (EbMemoryMapEntry*)malloc(sizeof(EbMemoryMapEntry));
     dec_handle_ptr->memory_map_index = 0;
     dec_handle_ptr->total_lib_memory = sizeof(EbComponentType) + sizeof(EbDecHandle) + sizeof(EbMemoryMapEntry);
     dec_handle_ptr->memory_map_init_address = dec_handle_ptr->memory_map;
-#else
-    dec_handle_ptr->memory_map = (EbMemoryMapEntry*)malloc(sizeof(EbMemoryMapEntry) * MAX_NUM_PTR);
-    dec_handle_ptr->memory_map_index = 0;
-    dec_handle_ptr->total_lib_memory = sizeof(EbDecHandle) + sizeof(EbMemoryMapEntry) * MAX_NUM_PTR;
-#endif
-    // Save Memory Map Pointers 
+    // Save Memory Map Pointers
     svt_dec_total_lib_memory = &dec_handle_ptr->total_lib_memory;
     svt_dec_memory_map = dec_handle_ptr->memory_map;
     svt_dec_memory_map_index = &dec_handle_ptr->memory_map_index;
@@ -105,8 +100,14 @@ int svt_dec_out_buf(
     EbDecHandle         *dec_handle_ptr,
     EbBufferHeaderType  *p_buffer)
 {
-    EbPictureBufferDesc *recon_picture_buf = dec_handle_ptr->recon_picture_buf[0];
+    EbPictureBufferDesc *recon_picture_buf = dec_handle_ptr->cur_pic_buf[0]->ps_pic_buf;
     EbSvtIOFormat       *out_img = (EbSvtIOFormat*)p_buffer->p_buffer;
+
+    /* TODO: Should add logic for show_existing_frame */
+    if (0 == dec_handle_ptr->show_frame) {
+        assert(0 == dec_handle_ptr->show_existing_frame);
+        return 0;
+    }
 
     int wd = dec_handle_ptr->frame_header.frame_size.frame_width;
     int ht = dec_handle_ptr->frame_header.frame_size.frame_height;
@@ -122,12 +123,11 @@ int svt_dec_out_buf(
     }
 
     if (recon_picture_buf->bit_depth == EB_8BIT) {
-
     uint8_t *dst;
     uint8_t *src;
 
     /* Luma */
-    dst = out_img->luma + out_img->origin_x + 
+    dst = out_img->luma + out_img->origin_x +
             (out_img->origin_y * out_img->y_stride);
     src = recon_picture_buf->buffer_y + recon_picture_buf->origin_x +
         (recon_picture_buf->origin_y * recon_picture_buf->stride_y);
@@ -162,8 +162,44 @@ int svt_dec_out_buf(
         src += recon_picture_buf->stride_cr;
     }
     } else {
-        assert(0);
-        return 0;
+        uint16_t *pu2_dst;
+        uint16_t *pu2_src;
+
+        /* Luma */
+        pu2_dst = (uint16_t *)out_img->luma + out_img->origin_x +
+                (out_img->origin_y * out_img->y_stride);
+        pu2_src = (uint16_t *)recon_picture_buf->buffer_y + recon_picture_buf->origin_x +
+            (recon_picture_buf->origin_y * recon_picture_buf->stride_y);
+
+        for (i = 0; i < ht; i++) {
+            memcpy(pu2_dst, pu2_src, sizeof(uint16_t) * wd);
+            pu2_dst += out_img->y_stride;
+            pu2_src += recon_picture_buf->stride_y;
+        }
+
+        /* Cb */
+        pu2_dst = (uint16_t *)out_img->cb + (out_img->origin_x >> sx) +
+            ((out_img->origin_y >> sy) * out_img->cb_stride);
+        pu2_src = (uint16_t *)recon_picture_buf->buffer_cb + (recon_picture_buf->origin_x >> sx) +
+            ((recon_picture_buf->origin_y >> sy) * recon_picture_buf->stride_cb);
+
+        for (i = 0; i < ht >> sy; i++) {
+            memcpy(pu2_dst, pu2_src, sizeof(uint16_t) * wd >> sx);
+            pu2_dst += out_img->cb_stride;
+            pu2_src += recon_picture_buf->stride_cb;
+        }
+
+        /* Cr */
+        pu2_dst = (uint16_t *)out_img->cr + (out_img->origin_x >> sx) +
+            ((out_img->origin_y >> sy) * out_img->cr_stride);
+        pu2_src = (uint16_t *)recon_picture_buf->buffer_cr + (recon_picture_buf->origin_x >> sx) +
+            ((recon_picture_buf->origin_y >> sy)* recon_picture_buf->stride_cr);
+
+        for (i = 0; i < ht >> sy; i++) {
+            memcpy(pu2_dst, pu2_src, sizeof(uint16_t) * wd >> sx);
+            pu2_dst += out_img->cr_stride;
+            pu2_src += recon_picture_buf->stride_cr;
+        }
     }
     return 1;
 }
@@ -214,9 +250,9 @@ static EbErrorType init_svt_av1_decoder_handle(
 
     printf("SVT [version]:\tSVT-AV1 Decoder Lib v%d.%d.%d\n",
         SVT_VERSION_MAJOR, SVT_VERSION_MINOR, SVT_VERSION_PATCHLEVEL);
-#if ( defined( _MSC_VER ) && (_MSC_VER < 1910) ) 
+#if ( defined( _MSC_VER ) && (_MSC_VER < 1910) )
     printf("SVT [build]  : Visual Studio 2013");
-#elif ( defined( _MSC_VER ) && (_MSC_VER >= 1910) ) 
+#elif ( defined( _MSC_VER ) && (_MSC_VER >= 1910) )
     printf("SVT [build]  :\tVisual Studio 2017");
 #elif defined(__GNUC__)
     printf("SVT [build]  :\tGCC %d.%d.%d\t", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
@@ -256,22 +292,18 @@ EB_API EbErrorType eb_dec_init_handle(
     *p_handle = (EbComponentType*) malloc(sizeof(EbComponentType));
 
     if (*p_handle != (EbComponentType*)NULL) {
-
         // Init Component OS objects (threads, semaphores, etc.)
         // also links the various Component control functions
         return_error = init_svt_av1_decoder_handle(*p_handle);
 
-        if (return_error == EB_ErrorNone) {
+        if (return_error == EB_ErrorNone)
             ((EbComponentType*)(*p_handle))->p_application_private = p_app_data;
-
-        }
         else if (return_error == EB_ErrorInsufficientResources) {
             eb_deinit_decoder((EbComponentType*)NULL);
             *p_handle = (EbComponentType*)NULL;
         }
-        else {
+        else
             return_error = EB_ErrorInvalidComponent;
-        }
     }
     else {
         //SVT_LOG("Error: Component Struct Malloc Failed\n");
@@ -301,7 +333,6 @@ EB_API EbErrorType eb_svt_dec_set_parameter(
     return EB_ErrorNone;
 }
 
-
 #if defined(__linux__) || defined(__APPLE__)
 __attribute__((visibility("default")))
 #endif
@@ -313,7 +344,7 @@ EB_API EbErrorType eb_init_decoder(
         return EB_ErrorBadParameter;
 
     EbDecHandle     *dec_handle_ptr = (EbDecHandle   *)svt_dec_component->p_component_private;
-    
+
     dec_handle_ptr->dec_cnt = -1;
     dec_handle_ptr->num_frms_prll   = 1;
     if(dec_handle_ptr->num_frms_prll > DEC_MAX_NUM_FRM_PRLL)
@@ -321,11 +352,14 @@ EB_API EbErrorType eb_init_decoder(
     dec_handle_ptr->seq_header_done = 0;
     dec_handle_ptr->mem_init_done   = 0;
 
-    dec_handle_ptr->seen_frame_header = 0;
+    dec_handle_ptr->seen_frame_header   = 0;
     dec_handle_ptr->show_existing_frame = 0;
+    dec_handle_ptr->show_frame          = 0;
+    dec_handle_ptr->showable_frame      = 0;
 
     assert(0 == dec_handle_ptr->dec_config.asm_type);
     setup_rtcd_internal(dec_handle_ptr->dec_config.asm_type);
+    asmSetConvolveAsmTable();
 
     init_intra_dc_predictors_c_internal();
 
@@ -341,29 +375,48 @@ EB_API EbErrorType eb_init_decoder(
     return return_error;
 }
 
-
 #if defined(__linux__) || defined(__APPLE__)
 __attribute__((visibility("default")))
 #endif
 EB_API EbErrorType eb_svt_decode_frame(
     EbComponentType     *svt_dec_component,
     const uint8_t       *data,
-    const uint32_t       data_size)
+    const size_t         data_size)
 {
     EbErrorType return_error = EB_ErrorNone;
     if (svt_dec_component == NULL)
         return EB_ErrorBadParameter;
 
-    EbDecHandle     *dec_handle_ptr = (EbDecHandle   *)svt_dec_component->p_component_private;
-    /*TODO : Remove or move. For Test purpose only */
-    dec_handle_ptr->dec_cnt++;
-    printf("\n SVT-AV1 Dec : Decoding Pic #%d", dec_handle_ptr->dec_cnt);
+    EbDecHandle *dec_handle_ptr = (EbDecHandle *)svt_dec_component->p_component_private;
+    uint8_t *data_start = (uint8_t *)data;
+    uint8_t *data_end = (uint8_t *)data + data_size;
 
-    return_error = decode_multiple_obu(dec_handle_ptr, data, data_size);
+    while (data_start < data_end)
+    {
+        /*TODO : Remove or move. For Test purpose only */
+        dec_handle_ptr->dec_cnt++;
+        printf("\n SVT-AV1 Dec : Decoding Pic #%d", dec_handle_ptr->dec_cnt);
+
+        uint64_t frame_size = 0;
+        /*if (ctx->is_annexb) {
+        }
+        else*/
+        frame_size = data_end - data_start;
+        return_error = decode_multiple_obu(dec_handle_ptr, &data_start, frame_size);
+
+        dec_pic_mgr_update_ref_pic(dec_handle_ptr, (EB_ErrorNone == return_error)
+                    ? 1 : 0, dec_handle_ptr->frame_header.refresh_frame_flags);
+
+        // Allow extra zero bytes after the frame end
+        while (data < data_end) {
+            const uint8_t marker = data[0];
+            if (marker) break;
+            ++data;
+        }
+    }
 
     return return_error;
 }
-
 
 #if defined(__linux__) || defined(__APPLE__)
 __attribute__((visibility("default")))
@@ -376,20 +429,17 @@ EB_API EbErrorType eb_svt_dec_get_picture(
 {
     (void)stream_info;
     (void)frame_info;
-    
+
     EbErrorType return_error = EB_ErrorNone;
     if (svt_dec_component == NULL)
         return EB_ErrorBadParameter;
 
     EbDecHandle     *dec_handle_ptr = (EbDecHandle   *)svt_dec_component->p_component_private;
     /* Copy from recon pointer and return! TODO: Should remove the memcpy! */
-    if (0 == svt_dec_out_buf(dec_handle_ptr, p_buffer)) {
+    if (0 == svt_dec_out_buf(dec_handle_ptr, p_buffer))
         return_error = EB_DecNoOutputPicture;
-    }
-
     return return_error;
 }
-
 
 #if defined(__linux__) || defined(__APPLE__)
 __attribute__((visibility("default")))
@@ -399,7 +449,6 @@ EB_API EbErrorType eb_deinit_decoder(
 {
     if (svt_dec_component == NULL)
         return EB_ErrorBadParameter;
-#if MEM_MAP_OPT
     EbDecHandle *dec_handle_ptr = (EbDecHandle*)svt_dec_component->p_component_private;
     EbErrorType return_error    = EB_ErrorNone;
 
@@ -441,49 +490,6 @@ EB_API EbErrorType eb_deinit_decoder(
             }
         }
     }
-#else
-    EbDecHandle *dec_handle_ptr = (EbDecHandle*)svt_dec_component->p_component_private;
-    EbErrorType return_error = EB_ErrorNone;
-    int32_t              ptrIndex = 0;
-    EbMemoryMapEntry*   memoryEntry = (EbMemoryMapEntry*)EB_NULL;
-
-    if (dec_handle_ptr) {
-        if (dec_handle_ptr->memory_map_index) {
-            // Loop through the ptr table and free all malloc'd pointers per channel
-            for (ptrIndex = (dec_handle_ptr->memory_map_index) - 1; ptrIndex >= 0; --ptrIndex) {
-                memoryEntry = &dec_handle_ptr->memory_map[ptrIndex];
-                switch (memoryEntry->ptr_type) {
-                case EB_N_PTR:
-                    free(memoryEntry->ptr);
-                    break;
-                case EB_A_PTR:
-#ifdef _WIN32
-                    _aligned_free(memoryEntry->ptr);
-#else
-                    free(memoryEntry->ptr);
-#endif
-                    break;
-                case EB_SEMAPHORE:
-                    eb_destroy_semaphore(memoryEntry->ptr);
-                    break;
-                case EB_THREAD:
-                    eb_destroy_thread(memoryEntry->ptr);
-                    break;
-                case EB_MUTEX:
-                    eb_destroy_mutex(memoryEntry->ptr);
-                    break;
-                default:
-                    return_error = EB_ErrorMax;
-                    break;
-                }
-            }
-            if (dec_handle_ptr->memory_map != (EbMemoryMapEntry*)NULL) {
-                free(dec_handle_ptr->memory_map);
-            }
-
-        }
-    }
-#endif
     return return_error;
 }
 
@@ -494,13 +500,10 @@ EbErrorType eb_dec_component_de_init(EbComponentType  *svt_dec_component)
 {
     EbErrorType       return_error = EB_ErrorNone;
 
-    if (svt_dec_component->p_component_private) {
+    if (svt_dec_component->p_component_private)
         free((EbDecHandle *)svt_dec_component->p_component_private);
-    }
-    else {
+    else
         return_error = EB_ErrorUndefined;
-    }
-
     return return_error;
 }
 
@@ -517,10 +520,8 @@ EB_API EbErrorType eb_dec_deinit_handle(
 
         free(svt_dec_component);
     }
-    else {
+    else
         return_error = EB_ErrorInvalidComponent;
-    }
-
     return return_error;
 }
 
