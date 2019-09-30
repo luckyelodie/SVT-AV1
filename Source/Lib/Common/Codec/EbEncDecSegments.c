@@ -9,58 +9,44 @@
 #include "EbEncDecSegments.h"
 #include "EbThreads.h"
 
-static void enc_dec_segments_dctor(EbPtr p)
-{
-    EncDecSegments* obj = (EncDecSegments*)p;
-    uint32_t row_index;
-    for (row_index = 0; row_index < obj->segment_max_row_count; ++row_index) {
-        EB_DESTROY_MUTEX(obj->row_array[row_index].assignment_mutex);
-    }
-    EB_DESTROY_MUTEX(obj->dep_map.update_mutex);
-    EB_FREE_ARRAY(obj->x_start_array);
-    EB_FREE_ARRAY(obj->y_start_array);
-    EB_FREE_ARRAY(obj->valid_lcu_count_array);
-    EB_FREE_ARRAY(obj->dep_map.dependency_map);
-    EB_FREE_ARRAY(obj->row_array);
-}
-
 EbErrorType enc_dec_segments_ctor(
-    EncDecSegments      *segments_ptr,
+    EncDecSegments **segments_dbl_ptr,
     uint32_t             segment_col_count,
     uint32_t             segment_row_count)
 {
     uint32_t row_index;
+    EncDecSegments *segments_ptr;
+    EB_MALLOC(EncDecSegments*, segments_ptr, sizeof(EncDecSegments), EB_N_PTR);
 
-    segments_ptr->dctor = enc_dec_segments_dctor;
+    *segments_dbl_ptr = segments_ptr;
 
     segments_ptr->segment_max_row_count = segment_row_count;
     segments_ptr->segment_max_band_count = segment_row_count + segment_col_count;
     segments_ptr->segment_max_total_count = segments_ptr->segment_max_row_count * segments_ptr->segment_max_band_count;
 
     // Start Arrays
-    EB_MALLOC_ARRAY(segments_ptr->x_start_array, segments_ptr->segment_max_total_count);
+    EB_MALLOC(uint16_t*, segments_ptr->x_start_array, sizeof(uint16_t) * segments_ptr->segment_max_total_count, EB_N_PTR);
 
-    EB_MALLOC_ARRAY(segments_ptr->y_start_array, segments_ptr->segment_max_total_count);
+    EB_MALLOC(uint16_t*, segments_ptr->y_start_array, sizeof(uint16_t) * segments_ptr->segment_max_total_count, EB_N_PTR);
 
-    EB_MALLOC_ARRAY(segments_ptr->valid_lcu_count_array, segments_ptr->segment_max_total_count);
+    EB_MALLOC(uint16_t*, segments_ptr->valid_lcu_count_array, sizeof(uint16_t) * segments_ptr->segment_max_total_count, EB_N_PTR);
 
     // Dependency map
-    EB_MALLOC_ARRAY(segments_ptr->dep_map.dependency_map, segments_ptr->segment_max_total_count);
+    EB_MALLOC(uint8_t*, segments_ptr->dep_map.dependency_map, sizeof(uint8_t) * segments_ptr->segment_max_total_count, EB_N_PTR);
 
-    EB_CREATE_MUTEX(segments_ptr->dep_map.update_mutex);
+    EB_CREATEMUTEX(EbHandle, segments_ptr->dep_map.update_mutex, sizeof(EbHandle), EB_MUTEX);
 
     // Segment rows
-    EB_MALLOC_ARRAY(segments_ptr->row_array,  segments_ptr->segment_max_row_count);
-    for (row_index = 0; row_index < segments_ptr->segment_max_row_count; ++row_index) {
-        segments_ptr->row_array[row_index].assignment_mutex = NULL;
-    }
+    EB_MALLOC(EncDecSegSegmentRow*, segments_ptr->row_array, sizeof(EncDecSegSegmentRow) * segments_ptr->segment_max_row_count, EB_N_PTR)
 
-    for (row_index = 0; row_index < segments_ptr->segment_max_row_count; ++row_index) {
-        EB_CREATE_MUTEX(segments_ptr->row_array[row_index].assignment_mutex);
-    }
+        for (row_index = 0; row_index < segments_ptr->segment_max_row_count; ++row_index) {
+            EB_CREATEMUTEX(EbHandle, segments_ptr->row_array[row_index].assignment_mutex, sizeof(EbHandle), EB_MUTEX);
+        }
 
     return EB_ErrorNone;
 }
+
+
 
 void enc_dec_segments_init(
     EncDecSegments *segments_ptr,
@@ -117,17 +103,21 @@ void enc_dec_segments_init(
     EB_MEMSET(segments_ptr->dep_map.dependency_map, 0, sizeof(uint8_t) * segments_ptr->segmentTotalCount);
     for (row_index = 0; row_index < segments_ptr->segment_row_count; ++row_index) {
         for (segment_index = segments_ptr->row_array[row_index].starting_seg_index; segment_index <= segments_ptr->row_array[row_index].ending_seg_index; ++segment_index) {
+
             // Check that segment is valid
             if (segments_ptr->valid_lcu_count_array[segment_index]) {
                 // Right Neighbor
-                if (segment_index < segments_ptr->row_array[row_index].ending_seg_index)
+                if (segment_index < segments_ptr->row_array[row_index].ending_seg_index) {
                     ++segments_ptr->dep_map.dependency_map[segment_index + 1];
+                }
                 // Bottom Neighbor
-                if (row_index < segments_ptr->segment_row_count - 1 && segment_index + segments_ptr->segment_band_count >= segments_ptr->row_array[row_index + 1].starting_seg_index)
+                if (row_index < segments_ptr->segment_row_count - 1 && segment_index + segments_ptr->segment_band_count >= segments_ptr->row_array[row_index + 1].starting_seg_index) {
                     ++segments_ptr->dep_map.dependency_map[segment_index + segments_ptr->segment_band_count];
+                }
             }
         }
     }
 
     return;
 }
+

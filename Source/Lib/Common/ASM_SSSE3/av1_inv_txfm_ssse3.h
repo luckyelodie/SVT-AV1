@@ -54,12 +54,14 @@ extern "C" {
     static INLINE void round_shift_16bit_ssse3(__m128i *in, int32_t size, int32_t bit) {
         if (bit < 0) {
             const __m128i scale = _mm_set1_epi16(1 << (15 + bit));
-            for (int32_t i = 0; i < size; ++i)
+            for (int32_t i = 0; i < size; ++i) {
                 in[i] = _mm_mulhrs_epi16(in[i], scale);
+            }
         }
         else if (bit > 0) {
-            for (int32_t i = 0; i < size; ++i)
+            for (int32_t i = 0; i < size; ++i) {
                 in[i] = _mm_slli_epi16(in[i], bit);
+            }
         }
     }
 
@@ -85,6 +87,10 @@ extern "C" {
       IADST_1D,     IIDENTITY_1D, IIDENTITY_1D, IDCT_1D,
       IIDENTITY_1D, IADST_1D,     IIDENTITY_1D, IFLIPADST_1D,
     };
+
+    // Sqrt2, Sqrt2^2, Sqrt2^3, Sqrt2^4, Sqrt2^5
+    static int32_t NewSqrt2list[TX_SIZES] = { 5793, 2 * 4096, 2 * 5793, 4 * 4096,
+                                              4 * 5793 };
 
     DECLARE_ALIGNED(16, static const int16_t, av1_eob_to_eobxy_8x8_default[8]) = {
       0x0707, 0x0707, 0x0707, 0x0707, 0x0707, 0x0707, 0x0707, 0x0707,
@@ -214,7 +220,7 @@ av1_eob_to_eobxy_32x16_default,
     typedef void(*transform_1d_ssse3)(const __m128i *input, __m128i *output,
         int8_t cos_bit);
 
-    void eb_av1_lowbd_inv_txfm2d_add_ssse3(const int32_t *input, uint8_t *output,
+    void av1_lowbd_inv_txfm2d_add_ssse3(const int32_t *input, uint8_t *output,
         int32_t stride, TxType tx_type,
         TxSize tx_size, int32_t eob);
 #ifdef __cplusplus

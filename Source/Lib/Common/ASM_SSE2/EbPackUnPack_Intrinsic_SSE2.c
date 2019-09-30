@@ -5,6 +5,7 @@
 
 #include "EbPackUnPack_SSE2.h"
 
+
 #include <emmintrin.h>
 #include <stdint.h>
 
@@ -214,6 +215,7 @@ void eb_enc_msb_un_pack2d_sse2_intrin(
 
             for (x = 0; x < height; x += 1) {
                 for (y = 0; y < width; y += 64) {
+
                     inPixel0 = _mm_loadu_si128((__m128i*)in16_bit_buffer);
                     inPixel1 = _mm_loadu_si128((__m128i*)(in16_bit_buffer + 8));
                     inPixel2 = _mm_loadu_si128((__m128i*)(in16_bit_buffer + 16));
@@ -416,8 +418,11 @@ void unpack_avg_sse2_intrin(
     uint32_t  width,
     uint32_t  height)
 {
+
     uint32_t  y;
     __m128i inPixel0, inPixel1;
+
+
 
     if (width == 4)
     {
@@ -468,10 +473,13 @@ void unpack_avg_sse2_intrin(
             dst_ptr += 2 * dst_stride;
             ref16_l0 += 2 * ref_l0_stride;
             ref16_l1 += 2 * ref_l1_stride;
+
         }
+
     }
     else if (width == 8)
     {
+
         __m128i out8_0_U8_L0, out8_0_U8_L1, out8_2_U8_L0, out8_2_U8_L1;
         __m128i avg8_0_U8, avg8_2_U8;
 
@@ -500,6 +508,7 @@ void unpack_avg_sse2_intrin(
 
             _mm_storel_epi64((__m128i*) dst_ptr, avg8_0_U8);
 
+
             //--------
             //Line Two
             //--------
@@ -523,10 +532,12 @@ void unpack_avg_sse2_intrin(
 
             _mm_storel_epi64((__m128i*)(dst_ptr + dst_stride), avg8_2_U8);
 
+
             dst_ptr += 2 * dst_stride;
             ref16_l0 += 2 * ref_l0_stride;
             ref16_l1 += 2 * ref_l1_stride;
         }
+
     }
     else if (width == 16)
     {
@@ -554,10 +565,12 @@ void unpack_avg_sse2_intrin(
 
             out8_0_U8_L1 = _mm_packus_epi16(_mm_srli_epi16(inPixel0, 2), _mm_srli_epi16(inPixel1, 2));
 
+
             //AVG
             avg8_0_U8 = _mm_avg_epu8(out8_0_U8_L0, out8_0_U8_L1);
 
             _mm_storeu_si128((__m128i*) dst_ptr, avg8_0_U8);
+
 
             //--------
             //Line Two
@@ -577,6 +590,7 @@ void unpack_avg_sse2_intrin(
 
             out8_2_U8_L1 = _mm_packus_epi16(_mm_srli_epi16(inPixel4, 2), _mm_srli_epi16(inPixel5, 2));
 
+
             //AVG
             avg8_2_U8 = _mm_avg_epu8(out8_2_U8_L0, out8_2_U8_L1);
 
@@ -585,7 +599,9 @@ void unpack_avg_sse2_intrin(
             dst_ptr += 2 * dst_stride;
             ref16_l0 += 2 * ref_l0_stride;
             ref16_l1 += 2 * ref_l1_stride;
+
         }
+
     }
     else if (width == 32)
     {
@@ -593,6 +609,7 @@ void unpack_avg_sse2_intrin(
         __m128i out8_0_U8_L0, out8_1_U8_L0, out8_2_U8_L0, out8_3_U8_L0;
         __m128i out8_0_U8_L1, out8_1_U8_L1, out8_2_U8_L1, out8_3_U8_L1;
         __m128i avg8_0_U8, avg8_1_U8, avg8_2_U8, avg8_3_U8;
+
 
         for (y = 0; y < height; y += 2)
         {
@@ -626,6 +643,7 @@ void unpack_avg_sse2_intrin(
 
             _mm_storeu_si128((__m128i*) dst_ptr, avg8_0_U8);
             _mm_storeu_si128((__m128i*)(dst_ptr + 16), avg8_1_U8);
+
 
             //--------
             //Line Two
@@ -661,7 +679,9 @@ void unpack_avg_sse2_intrin(
             dst_ptr += 2 * dst_stride;
             ref16_l0 += 2 * ref_l0_stride;
             ref16_l1 += 2 * ref_l1_stride;
+
         }
+
     }
     else if (width == 64)
     {
@@ -683,10 +703,13 @@ void unpack_avg_sse2_intrin(
             inPixel6 = _mm_loadu_si128((__m128i*)(ref16_l0 + 48));
             inPixel7 = _mm_loadu_si128((__m128i*)(ref16_l0 + 56));
 
+
+
             out8_0_U8_L0 = _mm_packus_epi16(_mm_srli_epi16(inPixel0, 2), _mm_srli_epi16(inPixel1, 2));
             out8_1_U8_L0 = _mm_packus_epi16(_mm_srli_epi16(inPixel2, 2), _mm_srli_epi16(inPixel3, 2));
             out8_2_U8_L0 = _mm_packus_epi16(_mm_srli_epi16(inPixel4, 2), _mm_srli_epi16(inPixel5, 2));
             out8_3_U8_L0 = _mm_packus_epi16(_mm_srli_epi16(inPixel6, 2), _mm_srli_epi16(inPixel7, 2));
+
 
             //List1
 
@@ -698,6 +721,7 @@ void unpack_avg_sse2_intrin(
             inPixel5 = _mm_loadu_si128((__m128i*)(ref16_l1 + 40));
             inPixel6 = _mm_loadu_si128((__m128i*)(ref16_l1 + 48));
             inPixel7 = _mm_loadu_si128((__m128i*)(ref16_l1 + 56));
+
 
             //Note: old Version used to use _mm_and_si128 to mask the MSB bits of the pixels
             out8_0_U8_L1 = _mm_packus_epi16(_mm_srli_epi16(inPixel0, 2), _mm_srli_epi16(inPixel1, 2));
@@ -716,11 +740,13 @@ void unpack_avg_sse2_intrin(
             _mm_storeu_si128((__m128i*)(dst_ptr + 32), avg8_2_U8);
             _mm_storeu_si128((__m128i*)(dst_ptr + 48), avg8_3_U8);
 
+
             dst_ptr += dst_stride;
             ref16_l0 += ref_l0_stride;
             ref16_l1 += ref_l1_stride;
         }
     }
+
 
     return;
 }
@@ -740,6 +766,7 @@ void eb_enc_msb_pack2d_sse2_intrin(
     uint32_t count_width, count_height;
 
     if (width == 4) {
+
         for (count_height = 0; count_height < height; count_height += 2) {
             _mm_storel_epi64((__m128i*)(out16_bit_buffer), _mm_srli_epi16(_mm_unpacklo_epi8(_mm_cvtsi32_si128(*(uint32_t*)(inn_bit_buffer)),
                 _mm_cvtsi32_si128(*(uint32_t*)(in8_bit_buffer))), 6));
@@ -751,7 +778,9 @@ void eb_enc_msb_pack2d_sse2_intrin(
         }
     }
     else if (width == 8) {
+
         for (count_height = 0; count_height < height; count_height += 2) {
+
             _mm_storeu_si128((__m128i*)(out16_bit_buffer), _mm_srli_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)(inn_bit_buffer)),
                 _mm_loadl_epi64((__m128i*)(in8_bit_buffer))), 6));
             _mm_storeu_si128((__m128i*)(out16_bit_buffer + out_stride), _mm_srli_epi16(_mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)(inn_bit_buffer + inn_stride)),
@@ -765,6 +794,7 @@ void eb_enc_msb_pack2d_sse2_intrin(
         __m128i outPixel1, outPixel2, outPixel3, outPixel4, innBitBuffer_lo, innBitBuffer_hi, in8BitBuffer_lo, in8BitBuffer_hi;
 
         for (count_height = 0; count_height < height; count_height += 2) {
+
             innBitBuffer_lo = _mm_loadu_si128((__m128i *)inn_bit_buffer);
             innBitBuffer_hi = _mm_loadu_si128((__m128i *)(inn_bit_buffer + inn_stride));
             in8BitBuffer_lo = _mm_loadu_si128((__m128i *)in8_bit_buffer);
@@ -825,6 +855,7 @@ void eb_enc_msb_pack2d_sse2_intrin(
         }
     }
     else if (width == 64) {
+
         __m128i innBitBuffer1, innBitBuffer2, innBitBuffer3, innBitBuffer4, in8BitBuffer1, in8BitBuffer2, in8BitBuffer3, in8BitBuffer4;
         __m128i outPixel1, outPixel2, outPixel3, outPixel4, outPixel5, outPixel6, outPixel7, outPixel8;
 

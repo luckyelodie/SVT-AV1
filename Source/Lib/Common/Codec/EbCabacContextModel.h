@@ -18,8 +18,6 @@
 #define EbCabacContextModel_h
 
 #include "EbDefinitions.h"
-#include "EbSegmentationParams.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,10 +44,6 @@ extern "C" {
     This function converts from one representation to the other (and is its own
     inverse).*/
 #define AOM_ICDF(x) (CDF_PROB_TOP - (x))
-
-#define SEG_TEMPORAL_PRED_CTXS 3
-#define SPATIAL_PREDICTION_PROBS 3
-#define SEG_TREE_PROBS (MAX_SEGMENTS - 1)
 
 #if CDF_SHIFT == 0
 
@@ -667,10 +661,12 @@ extern "C" {
         // Single loop (faster)
         for (i = 0; i < nsymbs - 1; ++i) {
             tmp = (i == val) ? 0 : tmp;
-            if (tmp < cdf[i])
+            if (tmp < cdf[i]) {
                 cdf[i] -= ((cdf[i] - tmp) >> rate);
-            else
+            }
+            else {
                 cdf[i] += ((tmp - cdf[i]) >> rate);
+            }
         }
         cdf[nsymbs] += (cdf[nsymbs] < 32);
     }
@@ -705,6 +701,7 @@ extern "C" {
 
 #define BASE_CONTEXT_POSITION_NUM 12
 
+
 #define DCT_MAX_VALUE 16384
 #define DCT_MAX_VALUE_HIGH10 65536
 #define DCT_MAX_VALUE_HIGH12 262144
@@ -715,8 +712,8 @@ extern "C" {
 
     struct AV1Common;
     struct FrameContexts;
-    void eb_av1_reset_cdf_symbol_counters(struct FrameContexts *fc);
-    void eb_av1_default_coef_probs(struct FrameContexts *fc, int32_t base_qindex);
+    void av1_reset_cdf_symbol_counters(struct FrameContexts *fc);
+    void av1_default_coef_probs(struct FrameContexts *fc, int32_t base_qindex);
     void init_mode_probs(struct FrameContexts *fc);
 
     struct FrameContexts;
@@ -814,6 +811,8 @@ extern "C" {
         return combine_entropy_contexts(above_ec, left_ec);
     }
 
+
+
     //**********************************************************************************************************************//
     // txb_Common.h
     static const TxClass tx_type_to_class[TX_TYPES] = {
@@ -841,7 +840,7 @@ extern "C" {
 
 /* Symbols for coding which components are zero jointly */
 #define MV_JOINTS 4
-    typedef enum MvJointType
+    typedef enum MvJointType 
     {
         MV_JOINT_ZERO = 0,   /* Zero vector */
         MV_JOINT_HNZVZ = 1,  /* Vert zero, hor nonzero */
@@ -859,7 +858,7 @@ extern "C" {
 
     /* Symbols for coding magnitude class of nonzero components */
 #define MV_CLASSES 11
-    typedef enum MvClassType
+    typedef enum MvClassType 
     {
         MV_CLASS_0 = 0,   /* (0, 2]     integer pel */
         MV_CLASS_1 = 1,   /* (2, 4]     integer pel */
@@ -888,7 +887,7 @@ extern "C" {
 #define MV_UPP (1 << MV_IN_USE_BITS)
 #define MV_LOW (-(1 << MV_IN_USE_BITS))
 
-    typedef struct NmvComponent
+    typedef struct NmvComponent 
     {
         AomCdfProb classes_cdf[CDF_SIZE(MV_CLASSES)];
         AomCdfProb class0_fp_cdf[CLASS0_SIZE][CDF_SIZE(MV_FP_SIZE)];
@@ -900,11 +899,12 @@ extern "C" {
         AomCdfProb bits_cdf[MV_OFFSET_BITS][CDF_SIZE(2)];
     } NmvComponent;
 
-    typedef struct NmvContext
+    typedef struct NmvContext 
     {
         AomCdfProb joints_cdf[CDF_SIZE(MV_JOINTS)];
         NmvComponent comps[2];
     } NmvContext;
+
 
     MvClassType av1_get_mv_class(int32_t z, int32_t *offset);
 
@@ -995,7 +995,7 @@ extern "C" {
 
         AomCdfProb inter_compound_mode_cdf[INTER_MODE_CONTEXTS]
             [CDF_SIZE(INTER_COMPOUND_MODES)];
-        AomCdfProb compound_type_cdf[BlockSizeS_ALL][CDF_SIZE(MASKED_COMPOUND_TYPES)];
+        AomCdfProb compound_type_cdf[BlockSizeS_ALL][CDF_SIZE(COMPOUND_TYPES - 1)];
         AomCdfProb wedge_idx_cdf[BlockSizeS_ALL][CDF_SIZE(16)];
         AomCdfProb interintra_cdf[BlockSize_GROUPS][CDF_SIZE(2)];
         AomCdfProb wedge_interintra_cdf[BlockSizeS_ALL][CDF_SIZE(2)];
@@ -1019,7 +1019,6 @@ extern "C" {
         AomCdfProb comp_ref_type_cdf[COMP_REF_TYPE_CONTEXTS][CDF_SIZE(2)];
         AomCdfProb uni_comp_ref_cdf[UNI_COMP_REF_CONTEXTS][UNIDIR_COMP_REFS - 1]
             [CDF_SIZE(2)];
-
         AomCdfProb comp_ref_cdf[REF_CONTEXTS][FWD_REFS - 1][CDF_SIZE(2)];
         AomCdfProb comp_bwdref_cdf[REF_CONTEXTS][BWD_REFS - 1][CDF_SIZE(2)];
         AomCdfProb txfm_partition_cdf[TXFM_PARTITION_CONTEXTS][CDF_SIZE(2)];
@@ -1066,7 +1065,11 @@ extern "C" {
         AomCdfProb cfl_sign_cdf[CDF_SIZE(CFL_JOINT_SIGNS)];
         AomCdfProb cfl_alpha_cdf[CFL_ALPHA_CONTEXTS][CDF_SIZE(CFL_ALPHABET_SIZE)];
         int32_t initialized;
+
+
     } FRAME_CONTEXT;
+
+
 
     extern const AomCdfProb default_kf_y_mode_cdf[KF_MODE_CONTEXTS]
         [KF_MODE_CONTEXTS]
@@ -1090,6 +1093,7 @@ extern "C" {
         { 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 4, 5, 3, 6, 7, 8 },
     };
 
+
     void av1_set_default_ref_deltas(int8_t *ref_deltas);
     void av1_set_default_mode_deltas(int8_t *mode_deltas);
     void av1_setup_frame_contexts(struct AV1Common *cm);
@@ -1105,8 +1109,14 @@ extern "C" {
         return i;
     }
 
+
+
+
     /**********************************************************************************************************************/
     // onyxc_int.h
+
+
+
 
     /**********************************************************************************************************************/
     /**********************************************************************************************************************/

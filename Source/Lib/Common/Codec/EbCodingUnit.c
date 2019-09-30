@@ -11,14 +11,6 @@
 #include "EbTransformUnit.h"
 #include "EbPictureControlSet.h"
 
-void largest_coding_unit_dctor(EbPtr p)
-{
-    LargestCodingUnit* obj = (LargestCodingUnit*)p;
-    EB_DELETE(obj->quantized_coeff);
-    EB_FREE_ARRAY(obj->av1xd);
-    EB_FREE_ARRAY(obj->final_cu_arr);
-    EB_FREE_ARRAY(obj->cu_partition_array);
-}
 /*
 Tasks & Questions
     -Need a GetEmptyChain function for testing sub partitions.  Tie it to an Itr?
@@ -29,7 +21,7 @@ Tasks & Questions
     -I don't see a way around doing the copies in temp memory and then copying it in...
 */
 EbErrorType largest_coding_unit_ctor(
-    LargestCodingUnit             *larget_coding_unit_ptr,
+    LargestCodingUnit        **larget_coding_unit_dbl_ptr,
     uint8_t                        sb_size_pix,
     uint16_t                       sb_origin_x,
     uint16_t                       sb_origin_y,
@@ -37,39 +29,46 @@ EbErrorType largest_coding_unit_ctor(
     PictureControlSet  *picture_control_set)
 
 {
+    EbErrorType return_error = EB_ErrorNone;
     uint32_t tu_index;
     EbPictureBufferDescInitData coeffInitData;
 
-    larget_coding_unit_ptr->dctor = largest_coding_unit_dctor;
+    LargestCodingUnit *largestCodingUnitPtr;
+    EB_MALLOC(LargestCodingUnit*, largestCodingUnitPtr, sizeof(LargestCodingUnit), EB_N_PTR);
+
+    *larget_coding_unit_dbl_ptr = largestCodingUnitPtr;
 
     // ************ SB ***************
         // Which borderLargestCuSize is not a power of two
 
         // Which borderLargestCuSize is not a power of two
-    larget_coding_unit_ptr->picture_control_set_ptr = picture_control_set;
+    largestCodingUnitPtr->picture_control_set_ptr = picture_control_set;
 
-    larget_coding_unit_ptr->origin_x = sb_origin_x;
-    larget_coding_unit_ptr->origin_y = sb_origin_y;
+    largestCodingUnitPtr->origin_x = sb_origin_x;
+    largestCodingUnitPtr->origin_y = sb_origin_y;
 
-    larget_coding_unit_ptr->index = sb_index;
+    largestCodingUnitPtr->index = sb_index;
 
     uint32_t cu_i;
     uint32_t  tot_cu_num = sb_size_pix == 128 ? 1024 : 256;
-    larget_coding_unit_ptr->final_cu_count = tot_cu_num;
 
-    EB_MALLOC_ARRAY(larget_coding_unit_ptr->final_cu_arr, tot_cu_num);
-    EB_MALLOC_ARRAY(larget_coding_unit_ptr->av1xd, tot_cu_num);
+
+    EB_MALLOC(CodingUnit*, largestCodingUnitPtr->final_cu_arr, sizeof(CodingUnit) * tot_cu_num, EB_N_PTR);
 
     for (cu_i = 0; cu_i < tot_cu_num; ++cu_i) {
-        for (tu_index = 0; tu_index < TRANSFORM_UNIT_MAX_COUNT; ++tu_index)
-            larget_coding_unit_ptr->final_cu_arr[cu_i].transform_unit_array[tu_index].tu_index = tu_index;
-        larget_coding_unit_ptr->final_cu_arr[cu_i].leaf_index = cu_i;
-        larget_coding_unit_ptr->final_cu_arr[cu_i].av1xd = larget_coding_unit_ptr->av1xd + cu_i;
+
+        for (tu_index = 0; tu_index < TRANSFORM_UNIT_MAX_COUNT; ++tu_index) {
+            largestCodingUnitPtr->final_cu_arr[cu_i].transform_unit_array[tu_index].tu_index = tu_index;
+        }
+
+        largestCodingUnitPtr->final_cu_arr[cu_i].leaf_index = cu_i;
+
+        EB_MALLOC(MacroBlockD*, largestCodingUnitPtr->final_cu_arr[cu_i].av1xd, sizeof(MacroBlockD), EB_N_PTR);
     }
 
-    uint32_t  max_block_count = sb_size_pix == 128 ? BLOCK_MAX_COUNT_SB_128 : BLOCK_MAX_COUNT_SB_64;
+    uint32_t  max_block_count = sb_size_pix == 128 ? BLOCK_MAX_COUNT_SB_128 : BLOCK_MAX_COUNT_SB_64; 
 
-    EB_MALLOC_ARRAY(larget_coding_unit_ptr->cu_partition_array, max_block_count);
+    EB_MALLOC(PartitionType*, largestCodingUnitPtr->cu_partition_array, sizeof(PartitionType) * max_block_count, EB_N_PTR);
 
     coeffInitData.buffer_enable_mask = PICTURE_BUFFER_DESC_FULL_MASK;
     coeffInitData.max_width = SB_STRIDE_Y;
@@ -82,10 +81,13 @@ EbErrorType largest_coding_unit_ctor(
     coeffInitData.bot_padding = 0;
     coeffInitData.split_mode = EB_FALSE;
 
-    EB_NEW(
-        larget_coding_unit_ptr->quantized_coeff,
-        eb_picture_buffer_desc_ctor,
+    return_error = eb_picture_buffer_desc_ctor(
+        (EbPtr*) &(largestCodingUnitPtr->quantized_coeff),
         (EbPtr)&coeffInitData);
+
+    if (return_error == EB_ErrorInsufficientResources) {
+        return EB_ErrorInsufficientResources;
+    }
 
     return EB_ErrorNone;
 }

@@ -15,9 +15,6 @@
 #include <stdlib.h>
 #include <random>
 #include "EbCabacContextModel.h"
-#if defined(CHAR_BIT)
-#undef CHAR_BIT  // defined in clang/9.1.0/include/limits.h
-#endif
 #include "EbDecBitReader.h"
 #include "gtest/gtest.h"
 #include "random.h"
@@ -123,25 +120,25 @@ class BitstreamWriterTest : public ::testing::Test {
         case 3:
             // uniform distribution between 0 ~ 255
             for (int i = 0; i < total_probas; ++i)
-                probas[i] = (uint8_t)normal_probs_->random();
+                probas[i] = normal_probs_->random();
             break;
         case 4:
             // low probability
             for (int i = 0; i < total_probas; ++i)
-                probas[i] = (uint8_t)low_probs_->random();
+                probas[i] = low_probs_->random();
             break;
         case 5:
             // high probability
             for (int i = 0; i < total_probas; ++i)
-                probas[i] = 255 - (uint8_t)low_probs_->random();
+                probas[i] = 255 - low_probs_->random();
             break;
         case 6:
         default:
             // mix high and low probability
             for (int i = 0; i < total_probas; ++i) {
                 bool flip = flip_dist(gen_);
-                probas[i] = flip ? (uint8_t)low_probs_->random()
-                                 : 255 - (uint8_t)low_probs_->random();
+                probas[i] =
+                    flip ? low_probs_->random() : 255 - low_probs_->random();
             }
             break;
         }
@@ -198,17 +195,14 @@ TEST(Entropy_BitstreamWriter, write_literal_extreme_int) {
 }
 
 TEST(Entropy_BitstreamWriter, write_symbol_no_update) {
-    AomWriter bw;
-    memset(&bw, 0, sizeof(bw));
-
+    AomWriter bw = {0};
     const int buffer_size = 1024;
     uint8_t stream_buffer[buffer_size];
 
     // get default cdf
     const int base_qindex = 20;
-    FRAME_CONTEXT fc;
-    memset(&fc, 0, sizeof(fc));
-    eb_av1_default_coef_probs(&fc, base_qindex);
+    FRAME_CONTEXT fc = {0};
+    av1_default_coef_probs(&fc, base_qindex);
 
     // write random bit sequences and expect read out
     // the same random sequences.
@@ -237,19 +231,15 @@ TEST(Entropy_BitstreamWriter, write_symbol_no_update) {
 }
 
 TEST(Entropy_BitstreamWriter, write_symbol_with_update) {
-    AomWriter bw;
-    memset(&bw, 0, sizeof(bw));
-
+    AomWriter bw = {0};
     const int buffer_size = 1024;
     uint8_t stream_buffer[buffer_size];
     bw.allow_update_cdf = 1;
 
     // get default cdf
     const int base_qindex = 20;
-    FRAME_CONTEXT fc;
-    memset(&fc, 0, sizeof(fc));
-
-    eb_av1_default_coef_probs(&fc, base_qindex);
+    FRAME_CONTEXT fc = {0};
+    av1_default_coef_probs(&fc, base_qindex);
 
     // write random bit sequences and expect read out
     // the same random sequences.
@@ -270,7 +260,7 @@ TEST(Entropy_BitstreamWriter, write_symbol_with_update) {
     SvtReader br;
     svt_reader_init(&br, stream_buffer, bw.pos);
     br.allow_update_cdf = 1;
-    eb_av1_default_coef_probs(&fc, base_qindex);  // reset cdf
+    av1_default_coef_probs(&fc, base_qindex);  // reset cdf
     for (int i = 0; i < 500; i++) {
         ASSERT_EQ(svt_read_symbol(&br, fc.txb_skip_cdf[0][0], 2, nullptr),
                   rnd(gen));

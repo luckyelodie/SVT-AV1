@@ -9,7 +9,7 @@
 #include "EbDefinitions.h"
 #include "EbSystemResourceManager.h"
 #include "EbPictureControlSet.h"
-#include "EbObject.h"
+
 
 /**************************************
  * Tasks Types
@@ -26,7 +26,6 @@ typedef enum RateControlTaskTypes {
  **************************************/
 typedef struct RateControlTasks
 {
-    EbDctor                           dctor;
     RateControlTaskTypes              task_type;
     EbObjectWrapper                  *picture_control_set_wrapper_ptr;
     uint32_t                              segment_index;
@@ -35,6 +34,7 @@ typedef struct RateControlTasks
     uint64_t                              picture_number;
     uint32_t                              row_number;
     uint32_t                              bit_count;
+
 } RateControlTasks;
 
 typedef struct RateControlTasksInitData {
@@ -44,8 +44,9 @@ typedef struct RateControlTasksInitData {
 /**************************************
  * Extern Function Declarations
  **************************************/
-extern EbErrorType rate_control_tasks_creator(
+extern EbErrorType rate_control_tasks_ctor(
     EbPtr *object_dbl_ptr,
     EbPtr  object_init_data_ptr);
+
 
 #endif // EbRateControlTasks_h

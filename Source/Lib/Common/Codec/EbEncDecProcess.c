@@ -24,13 +24,13 @@
 #include "EbUtility.h"
 #include "grainSynthesis.h"
 
-void eb_av1_cdef_search(
+void av1_cdef_search(
     EncDecContext                *context_ptr,
     SequenceControlSet           *sequence_control_set_ptr,
     PictureControlSet            *picture_control_set_ptr
 );
 
-void eb_av1_cdef_frame(
+void av1_cdef_frame(
     EncDecContext                *context_ptr,
     SequenceControlSet           *sequence_control_set_ptr,
     PictureControlSet            *pCs
@@ -47,13 +47,13 @@ void av1_cdef_frame16bit(
     PictureControlSet            *pCs
 );
 
-void eb_av1_add_film_grain(EbPictureBufferDesc *src,
+void av1_add_film_grain(EbPictureBufferDesc *src,
     EbPictureBufferDesc *dst,
     aom_film_grain_t *film_grain_ptr);
 
-void eb_av1_loop_restoration_save_boundary_lines(const Yv12BufferConfig *frame, Av1Common *cm, int32_t after_cdef);
-void eb_av1_pick_filter_restoration(const Yv12BufferConfig *src, Yv12BufferConfig * trial_frame_rst /*Av1Comp *cpi*/, Macroblock *x, Av1Common *const cm);
-void eb_av1_loop_restoration_filter_frame(Yv12BufferConfig *frame, Av1Common *cm, int32_t optimized_lr);
+void av1_loop_restoration_save_boundary_lines(const Yv12BufferConfig *frame, Av1Common *cm, int32_t after_cdef);
+void av1_pick_filter_restoration(const Yv12BufferConfig *src, Yv12BufferConfig * trial_frame_rst /*Av1Comp *cpi*/, Macroblock *x, Av1Common *const cm);
+void av1_loop_restoration_filter_frame(Yv12BufferConfig *frame, Av1Common *cm, int32_t optimized_lr);
 
 const int16_t encMinDeltaQpWeightTab[MAX_TEMPORAL_LAYERS] = { 100, 100, 100, 100, 100, 100 };
 const int16_t encMaxDeltaQpWeightTab[MAX_TEMPORAL_LAYERS] = { 100, 100, 100, 100, 100, 100 };
@@ -74,38 +74,27 @@ const int8_t  encMaxDeltaQpTab[4][MAX_TEMPORAL_LAYERS] = {
     { 4, 5, 5, 5, 5, 5 }
 };
 
-static void enc_dec_context_dctor(EbPtr p)
-{
-    EncDecContext* obj = (EncDecContext*)p;
-    EB_DELETE(obj->md_context);
-    EB_DELETE(obj->residual_buffer);
-    EB_DELETE(obj->transform_buffer);
-    EB_DELETE(obj->inverse_quant_buffer);
-    EB_DELETE(obj->input_sample16bit_buffer);
-    if (obj->is_md_rate_estimation_ptr_owner)
-        EB_FREE(obj->md_rate_estimation_ptr);
-    EB_FREE_ARRAY(obj->transform_inner_array_ptr);
-}
-
 /******************************************************
  * Enc Dec Context Constructor
  ******************************************************/
 EbErrorType enc_dec_context_ctor(
-    EncDecContext         *context_ptr,
+    EncDecContext        **context_dbl_ptr,
     EbFifo                *mode_decision_configuration_input_fifo_ptr,
     EbFifo                *packetization_output_fifo_ptr,
     EbFifo                *feedback_fifo_ptr,
     EbFifo                *picture_demux_fifo_ptr,
     EbBool                  is16bit,
     EbColorFormat           color_format,
-    EbBool                  enable_hbd_mode_decision,
     uint32_t                max_input_luma_width,
-    uint32_t                max_input_luma_height)
-{
+    uint32_t                max_input_luma_height){
+
     (void)max_input_luma_width;
     (void)max_input_luma_height;
+    EbErrorType return_error = EB_ErrorNone;
+    EncDecContext *context_ptr;
+    EB_MALLOC(EncDecContext*, context_ptr, sizeof(EncDecContext), EB_N_PTR);
+    *context_dbl_ptr = context_ptr;
 
-    context_ptr->dctor = enc_dec_context_dctor;
     context_ptr->is16bit = is16bit;
     context_ptr->color_format = color_format;
 
@@ -116,10 +105,10 @@ EbErrorType enc_dec_context_ctor(
     context_ptr->picture_demux_output_fifo_ptr = picture_demux_fifo_ptr;
 
     // Trasform Scratch Memory
-    EB_MALLOC_ARRAY(context_ptr->transform_inner_array_ptr, 3152); //refer to EbInvTransform_SSE2.as. case 32x32
+    EB_MALLOC(int16_t*, context_ptr->transform_inner_array_ptr, 3152, EB_N_PTR); //refer to EbInvTransform_SSE2.as. case 32x32
     // MD rate Estimation tables
-    EB_MALLOC(context_ptr->md_rate_estimation_ptr, sizeof(MdRateEstimationContext));
-    context_ptr->is_md_rate_estimation_ptr_owner = EB_TRUE;
+    EB_MALLOC(MdRateEstimationContext*, context_ptr->md_rate_estimation_ptr, sizeof(MdRateEstimationContext), EB_N_PTR);
+
 
     // Prediction Buffer
     {
@@ -140,11 +129,14 @@ EbErrorType enc_dec_context_ctor(
         if (is16bit) {
             initData.bit_depth = EB_16BIT;
 
-            EB_NEW(
-                context_ptr->input_sample16bit_buffer,
-                eb_picture_buffer_desc_ctor,
+            return_error = eb_picture_buffer_desc_ctor(
+                (EbPtr*)&context_ptr->input_sample16bit_buffer,
                 (EbPtr)&initData);
+            if (return_error == EB_ErrorInsufficientResources) {
+                return EB_ErrorInsufficientResources;
+            }
         }
+
     }
 
     // Scratch Coeff Buffer
@@ -162,6 +154,7 @@ EbErrorType enc_dec_context_ctor(
         initData.bot_padding = 0;
         initData.split_mode = EB_FALSE;
 
+
         EbPictureBufferDescInitData init32BitData;
 
         init32BitData.buffer_enable_mask = PICTURE_BUFFER_DESC_FULL_MASK;
@@ -174,41 +167,60 @@ EbErrorType enc_dec_context_ctor(
         init32BitData.top_padding = 0;
         init32BitData.bot_padding = 0;
         init32BitData.split_mode = EB_FALSE;
-        EB_NEW(
-            context_ptr->inverse_quant_buffer,
-            eb_picture_buffer_desc_ctor,
+        return_error = eb_picture_buffer_desc_ctor(
+            (EbPtr*)&context_ptr->inverse_quant_buffer,
             (EbPtr)&init32BitData);
-        EB_NEW(
-            context_ptr->transform_buffer,
-            eb_picture_buffer_desc_ctor,
+
+        if (return_error == EB_ErrorInsufficientResources) {
+            return EB_ErrorInsufficientResources;
+        }
+        return_error = eb_picture_buffer_desc_ctor(
+            (EbPtr*)&context_ptr->transform_buffer,
             (EbPtr)&init32BitData);
-        EB_NEW(
-            context_ptr->residual_buffer,
-            eb_picture_buffer_desc_ctor,
+        if (return_error == EB_ErrorInsufficientResources) {
+            return EB_ErrorInsufficientResources;
+        }
+
+        return_error = eb_picture_buffer_desc_ctor(
+            (EbPtr*)&context_ptr->residual_buffer,
             (EbPtr)&initData);
+        if (return_error == EB_ErrorInsufficientResources) {
+            return EB_ErrorInsufficientResources;
+        }
+
     }
 
+    // Intra Reference Samples
+    return_error = intra_reference_samples_ctor(&context_ptr->intra_ref_ptr);
+    if (return_error == EB_ErrorInsufficientResources) {
+        return EB_ErrorInsufficientResources;
+    }
+    context_ptr->intra_ref_ptr16 = (IntraReference16bitSamples *)EB_NULL;
+    if (is16bit) {
+        return_error = intra_reference16bit_samples_ctor(&context_ptr->intra_ref_ptr16);
+        if (return_error == EB_ErrorInsufficientResources) {
+            return EB_ErrorInsufficientResources;
+        }
+    }
     // Mode Decision Context
-    EB_NEW(
-        context_ptr->md_context,
-        mode_decision_context_ctor,
-        color_format, 0, 0, enable_hbd_mode_decision);
+    return_error = mode_decision_context_ctor(&context_ptr->md_context, color_format, 0, 0);
 
-    if (enable_hbd_mode_decision)
-        context_ptr->md_context->input_sample16bit_buffer = context_ptr->input_sample16bit_buffer;
+    if (return_error == EB_ErrorInsufficientResources) {
+        return EB_ErrorInsufficientResources;
+    }
+
+    // Second Stage ME Context
+    if (return_error == EB_ErrorInsufficientResources) {
+        return EB_ErrorInsufficientResources;
+    }
+
 
     context_ptr->md_context->enc_dec_context_ptr = context_ptr;
 
     return EB_ErrorNone;
 }
 
-/**************************************************
- * Reset Segmentation Map
- *************************************************/
-static void reset_segmentation_map(SegmentationNeighborMap *segmentation_map){
-    if(segmentation_map->data!=NULL)
-        EB_MEMSET(segmentation_map->data, ~0, segmentation_map->map_size);
-}
+
 
 /**************************************************
  * Reset Mode Decision Neighbor Arrays
@@ -224,16 +236,15 @@ static void ResetEncodePassNeighborArrays(PictureControlSet *picture_control_set
     neighbor_array_unit_reset(picture_control_set_ptr->ep_luma_recon_neighbor_array);
     neighbor_array_unit_reset(picture_control_set_ptr->ep_cb_recon_neighbor_array);
     neighbor_array_unit_reset(picture_control_set_ptr->ep_cr_recon_neighbor_array);
+#if DC_SIGN_CONTEXT_EP
     neighbor_array_unit_reset(picture_control_set_ptr->ep_luma_dc_sign_level_coeff_neighbor_array);
     neighbor_array_unit_reset(picture_control_set_ptr->ep_cb_dc_sign_level_coeff_neighbor_array);
     neighbor_array_unit_reset(picture_control_set_ptr->ep_cr_dc_sign_level_coeff_neighbor_array);
-    // TODO(Joel): 8-bit ep_luma_recon_neighbor_array (Cb,Cr) when is16bit==0?
-    EbBool is16bit = (EbBool)(picture_control_set_ptr->parent_pcs_ptr->sequence_control_set_ptr->static_config.encoder_bit_depth > EB_8BIT);
-    if (is16bit) {
-        neighbor_array_unit_reset(picture_control_set_ptr->ep_luma_recon_neighbor_array16bit);
-        neighbor_array_unit_reset(picture_control_set_ptr->ep_cb_recon_neighbor_array16bit);
-        neighbor_array_unit_reset(picture_control_set_ptr->ep_cr_recon_neighbor_array16bit);
-    }
+#endif
+#if !OPT_LOSSLESS_0
+    neighbor_array_unit_reset(picture_control_set_ptr->amvp_mv_merge_mv_neighbor_array);
+    neighbor_array_unit_reset(picture_control_set_ptr->amvp_mv_merge_mode_type_neighbor_array);
+#endif
     return;
 }
 
@@ -246,11 +257,10 @@ static void ResetEncDec(
     SequenceControlSet    *sequence_control_set_ptr,
     uint32_t                   segment_index)
 {
-#if !ENABLE_CDF_UPDATE
     EB_SLICE                     slice_type;
     MdRateEstimationContext   *md_rate_estimation_array;
-#endif
     context_ptr->is16bit = (EbBool)(sequence_control_set_ptr->static_config.encoder_bit_depth > EB_8BIT);
+
 
     // QP
     //context_ptr->qp          = picture_control_set_ptr->parent_pcs_ptr->tilePtrArray[tileIndex]->tileQp;
@@ -266,24 +276,15 @@ static void ResetEncDec(
     context_ptr->chroma_qp = context_ptr->qp;
 
     // Lambda Assignement
-    context_ptr->qp_index = (uint8_t)picture_control_set_ptr->
-        parent_pcs_ptr->frm_hdr.quantization_params.base_q_idx;
+    context_ptr->qp_index = (uint8_t)picture_control_set_ptr->parent_pcs_ptr->base_qindex;
     (*av1_lambda_assignment_function_table[picture_control_set_ptr->parent_pcs_ptr->pred_structure])(
         &context_ptr->fast_lambda,
         &context_ptr->full_lambda,
         &context_ptr->fast_chroma_lambda,
         &context_ptr->full_chroma_lambda,
         (uint8_t)picture_control_set_ptr->parent_pcs_ptr->enhanced_picture_ptr->bit_depth,
-        context_ptr->qp_index,
-        picture_control_set_ptr->hbd_mode_decision);
-#if ENABLE_CDF_UPDATE
-    // Reset MD rate Estimation table to initial values by copying from md_rate_estimation_array
-    if (context_ptr->is_md_rate_estimation_ptr_owner) {
-        EB_FREE(context_ptr->md_rate_estimation_ptr);
-        context_ptr->is_md_rate_estimation_ptr_owner = EB_FALSE;
-    }
-    context_ptr->md_rate_estimation_ptr = picture_control_set_ptr->md_rate_estimation_array;
-#else
+        context_ptr->qp_index);
+
     // Slice Type
     slice_type =
         (picture_control_set_ptr->parent_pcs_ptr->idr_flag == EB_TRUE) ? I_SLICE :
@@ -298,17 +299,19 @@ static void ResetEncDec(
 #endif
 
     // Reset MD rate Estimation table to initial values by copying from md_rate_estimation_array
-    if (context_ptr->is_md_rate_estimation_ptr_owner) {
-        EB_FREE(context_ptr->md_rate_estimation_ptr);
-        context_ptr->is_md_rate_estimation_ptr_owner = EB_FALSE;
-    }
 
     context_ptr->md_rate_estimation_ptr = md_rate_estimation_array;
+#if !OPT_LOSSLESS_0
+    // TMVP Map Writer pointer
+    if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE)
+        context_ptr->reference_object_write_ptr = (EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr;
+    else
+        context_ptr->reference_object_write_ptr = (EbReferenceObject*)EB_NULL;
 #endif
-    if (segment_index == 0){
+    if (segment_index == 0) {
         ResetEncodePassNeighborArrays(picture_control_set_ptr);
-        reset_segmentation_map(picture_control_set_ptr->segmentation_neighbor_map);
     }
+
 
     return;
 }
@@ -324,26 +327,29 @@ static void EncDecConfigureLcu(
     uint8_t                    picture_qp,
     uint8_t                    sb_qp)
 {
+
     //RC is off
-    if (sequence_control_set_ptr->static_config.rate_control_mode == 0 && sequence_control_set_ptr->static_config.improve_sharpness == 0)
+    if (sequence_control_set_ptr->static_config.rate_control_mode == 0 && sequence_control_set_ptr->static_config.improve_sharpness == 0) {
         context_ptr->qp = picture_qp;
+
+    }
     //RC is on
-    else
+    else {
         context_ptr->qp = sb_qp;
+    }
+
     // Asuming cb and cr offset to be the same for chroma QP in both slice and pps for lambda computation
     context_ptr->chroma_qp = context_ptr->qp;
     /* Note(CHKN) : when Qp modulation varies QP on a sub-LCU(CU) basis,  Lamda has to change based on Cu->QP , and then this code has to move inside the CU loop in MD */
     (void)sb_ptr;
-    context_ptr->qp_index = (uint8_t)picture_control_set_ptr->
-        parent_pcs_ptr->frm_hdr.quantization_params.base_q_idx;
+    context_ptr->qp_index = (uint8_t)picture_control_set_ptr->parent_pcs_ptr->base_qindex;
     (*av1_lambda_assignment_function_table[picture_control_set_ptr->parent_pcs_ptr->pred_structure])(
         &context_ptr->fast_lambda,
         &context_ptr->full_lambda,
         &context_ptr->fast_chroma_lambda,
         &context_ptr->full_chroma_lambda,
         (uint8_t)picture_control_set_ptr->parent_pcs_ptr->enhanced_picture_ptr->bit_depth,
-        context_ptr->qp_index,
-        picture_control_set_ptr->hbd_mode_decision);
+        context_ptr->qp_index);
 
     return;
 }
@@ -412,7 +418,9 @@ EbBool AssignEncDecSegments(
     //    trace = fopen("seg-trace.txt","w");
     //}
 
+
     switch (taskPtr->input_type) {
+
     case ENCDEC_TASKS_MDC_INPUT:
 
         // The entire picture is provided by the MDC process, so
@@ -485,8 +493,9 @@ EbBool AssignEncDecSegments(
             --segmentPtr->dep_map.dependency_map[bottomLeftSegmentIndex];
 
             if (segmentPtr->dep_map.dependency_map[bottomLeftSegmentIndex] == 0) {
-                if (selfAssigned == EB_TRUE)
+                if (selfAssigned == EB_TRUE) {
                     feedbackRowIndex = (int16_t)rowSegmentIndex + 1;
+                }
                 else {
                     *segmentInOutIndex = segmentPtr->row_array[rowSegmentIndex + 1].current_seg_index;
                     ++segmentPtr->row_array[rowSegmentIndex + 1].current_seg_index;
@@ -523,6 +532,7 @@ EbBool AssignEncDecSegments(
 void ReconOutput(
     PictureControlSet    *picture_control_set_ptr,
     SequenceControlSet   *sequence_control_set_ptr) {
+
     EbObjectWrapper             *outputReconWrapperPtr;
     EbBufferHeaderType           *outputReconPtr;
     EncodeContext               *encode_context_ptr = sequence_control_set_ptr->encode_context_ptr;
@@ -532,7 +542,9 @@ void ReconOutput(
     //   the encoder might not properly terminate.
     eb_block_on_mutex(encode_context_ptr->total_number_of_recon_frame_mutex);
 
+#if ALT_REF_OVERLAY
     if (!picture_control_set_ptr->parent_pcs_ptr->is_alt_ref) {
+#endif
         // Get Recon Buffer
         eb_get_empty_object(
             sequence_control_set_ptr->encode_context_ptr->recon_output_fifo_ptr,
@@ -573,7 +585,7 @@ void ReconOutput(
 
             // FGN: Create a buffer if needed, copy the reconstructed picture and run the film grain synthesis algorithm
 
-            if (sequence_control_set_ptr->seq_header.film_grain_params_present) {
+            if (sequence_control_set_ptr->film_grain_params_present) {
                 EbPictureBufferDesc  *intermediateBufferPtr;
                 {
                     if (is16bit)
@@ -587,9 +599,9 @@ void ReconOutput(
                 if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE)
                     film_grain_ptr = &((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->film_grain_params;
                 else
-                    film_grain_ptr = &picture_control_set_ptr->parent_pcs_ptr->frm_hdr.film_grain_params;
+                    film_grain_ptr = &picture_control_set_ptr->parent_pcs_ptr->film_grain_params;
 
-                eb_av1_add_film_grain(recon_ptr, intermediateBufferPtr, film_grain_ptr);
+                av1_add_film_grain(recon_ptr, intermediateBufferPtr, film_grain_ptr);
                 recon_ptr = intermediateBufferPtr;
             }
 
@@ -663,21 +675,25 @@ void ReconOutput(
 
         // Post the Recon object
         eb_post_full_object(outputReconWrapperPtr);
+#if ALT_REF_OVERLAY
     }
     else {
         // Overlay and altref have 1 recon only, which is from overlay pictures. So the recon of the alt_ref is not sent to the application.
         // However, to hanlde the end of sequence properly, total_number_of_recon_frames is increamented
         encode_context_ptr->total_number_of_recon_frames++;
     }
+#endif
     eb_release_mutex(encode_context_ptr->total_number_of_recon_frame_mutex);
 }
 
-void psnr_calculations(
+void PsnrCalculations(
     PictureControlSet    *picture_control_set_ptr,
     SequenceControlSet   *sequence_control_set_ptr){
+
     EbBool is16bit = (sequence_control_set_ptr->static_config.encoder_bit_depth > EB_8BIT);
 
     if (!is16bit) {
+
         EbPictureBufferDesc *recon_ptr;
 
         if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE)
@@ -699,9 +715,10 @@ void psnr_calculations(
 
         residualDistortion = 0;
 
-        while (row_index < sequence_control_set_ptr->seq_header.max_frame_height) {
+        while (row_index < sequence_control_set_ptr->luma_height) {
+
             columnIndex = 0;
-            while (columnIndex < sequence_control_set_ptr->seq_header.max_frame_width) {
+            while (columnIndex < sequence_control_set_ptr->luma_width) {
                 residualDistortion += (int64_t)SQR((int64_t)(inputBuffer[columnIndex]) - (reconCoeffBuffer[columnIndex]));
                 ++columnIndex;
             }
@@ -719,6 +736,7 @@ void psnr_calculations(
         residualDistortion = 0;
         row_index = 0;
         while (row_index < sequence_control_set_ptr->chroma_height) {
+
             columnIndex = 0;
             while (columnIndex < sequence_control_set_ptr->chroma_width) {
                 residualDistortion += (int64_t)SQR((int64_t)(inputBuffer[columnIndex]) - (reconCoeffBuffer[columnIndex]));
@@ -738,6 +756,7 @@ void psnr_calculations(
         row_index = 0;
 
         while (row_index < sequence_control_set_ptr->chroma_height) {
+
             columnIndex = 0;
             while (columnIndex < sequence_control_set_ptr->chroma_width) {
                 residualDistortion += (int64_t)SQR((int64_t)(inputBuffer[columnIndex]) - (reconCoeffBuffer[columnIndex]));
@@ -755,6 +774,7 @@ void psnr_calculations(
         picture_control_set_ptr->parent_pcs_ptr->cb_sse = (uint32_t)sseTotal[2];
     }
     else {
+
         EbPictureBufferDesc *recon_ptr;
 
         if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE)
@@ -772,8 +792,9 @@ void psnr_calculations(
         uint16_t*  reconCoeffBuffer;
 
         if (sequence_control_set_ptr->static_config.ten_bit_format == 1) {
-            const uint32_t luma_width = sequence_control_set_ptr->seq_header.max_frame_width;
-            const uint32_t luma_height = sequence_control_set_ptr->seq_header.max_frame_height;
+
+            const uint32_t luma_width = sequence_control_set_ptr->luma_width;
+            const uint32_t luma_height = sequence_control_set_ptr->luma_height;
             const uint32_t chroma_width = sequence_control_set_ptr->chroma_width;
             const uint32_t picture_width_in_sb = (luma_width + 64 - 1) / 64;
             const uint32_t pictureHeighInLcu = (luma_height + 64 - 1) / 64;
@@ -799,6 +820,7 @@ void psnr_calculations(
             {
                 for (lcuNumberInWidth = 0; lcuNumberInWidth < picture_width_in_sb; ++lcuNumberInWidth)
                 {
+
                     uint32_t tbOriginX = lcuNumberInWidth * 64;
                     uint32_t tbOriginY = lcuNumberInHeight * 64;
                     uint32_t sb_width = (luma_width - tbOriginX) < 64 ? (luma_width - tbOriginX) : 64;
@@ -818,6 +840,7 @@ void psnr_calculations(
                     {
                         for (k = 0; k < sb_width / 4; k++)
                         {
+
                             four2bitPels = inputBufferBitInc[k + j * inn_stride];
 
                             nBitPixel = (four2bitPels >> 6) & 3;
@@ -825,10 +848,12 @@ void psnr_calculations(
                             outPixel = outPixel | nBitPixel;
                             residualDistortion += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 0 + j * recon_ptr->stride_y]);
 
+
                             nBitPixel = (four2bitPels >> 4) & 3;
                             outPixel = inputBuffer[k * 4 + 1 + j * input_picture_ptr->stride_y] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortion += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 1 + j * recon_ptr->stride_y]);
+
 
                             nBitPixel = (four2bitPels >> 2) & 3;
                             outPixel = inputBuffer[k * 4 + 2 + j * input_picture_ptr->stride_y] << 2;
@@ -839,6 +864,7 @@ void psnr_calculations(
                             outPixel = inputBuffer[k * 4 + 3 + j * input_picture_ptr->stride_y] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortion += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 3 + j * recon_ptr->stride_y]);
+
                         }
                     }
 
@@ -857,10 +883,13 @@ void psnr_calculations(
 
                     reconCoeffBuffer = reconBufferOrgU + tbOriginY * recon_ptr->stride_cb + tbOriginX;
 
+
+
                     for (j = 0; j < sb_height; j++)
                     {
                         for (k = 0; k < sb_width / 4; k++)
                         {
+
                             four2bitPels = inputBufferBitInc[k + j * inn_stride];
 
                             nBitPixel = (four2bitPels >> 6) & 3;
@@ -868,10 +897,12 @@ void psnr_calculations(
                             outPixel = outPixel | nBitPixel;
                             residualDistortionU += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 0 + j * recon_ptr->stride_cb]);
 
+
                             nBitPixel = (four2bitPels >> 4) & 3;
                             outPixel = inputBuffer[k * 4 + 1 + j * input_picture_ptr->stride_cb] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortionU += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 1 + j * recon_ptr->stride_cb]);
+
 
                             nBitPixel = (four2bitPels >> 2) & 3;
                             outPixel = inputBuffer[k * 4 + 2 + j * input_picture_ptr->stride_cb] << 2;
@@ -882,17 +913,21 @@ void psnr_calculations(
                             outPixel = inputBuffer[k * 4 + 3 + j * input_picture_ptr->stride_cb] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortionU += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 3 + j * recon_ptr->stride_cb]);
+
                         }
                     }
+
 
                     inputBuffer = inputBufferOrgV + tbOriginY * input_picture_ptr->stride_cr + tbOriginX;
                     inputBufferBitInc = input_picture_ptr->buffer_bit_inc_cr + tbOriginY * chroma2BitWidth + (tbOriginX / 4)*sb_height;
                     reconCoeffBuffer = reconBufferOrgV + tbOriginY * recon_ptr->stride_cr + tbOriginX;
 
+
                     for (j = 0; j < sb_height; j++)
                     {
                         for (k = 0; k < sb_width / 4; k++)
                         {
+
                             four2bitPels = inputBufferBitInc[k + j * inn_stride];
 
                             nBitPixel = (four2bitPels >> 6) & 3;
@@ -900,10 +935,12 @@ void psnr_calculations(
                             outPixel = outPixel | nBitPixel;
                             residualDistortionV += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 0 + j * recon_ptr->stride_cr]);
 
+
                             nBitPixel = (four2bitPels >> 4) & 3;
                             outPixel = inputBuffer[k * 4 + 1 + j * input_picture_ptr->stride_cr] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortionV += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 1 + j * recon_ptr->stride_cr]);
+
 
                             nBitPixel = (four2bitPels >> 2) & 3;
                             outPixel = inputBuffer[k * 4 + 2 + j * input_picture_ptr->stride_cr] << 2;
@@ -914,25 +951,34 @@ void psnr_calculations(
                             outPixel = inputBuffer[k * 4 + 3 + j * input_picture_ptr->stride_cr] << 2;
                             outPixel = outPixel | nBitPixel;
                             residualDistortionV += (int64_t)SQR((int64_t)outPixel - (int64_t)reconCoeffBuffer[k * 4 + 3 + j * recon_ptr->stride_cr]);
+
                         }
                     }
+
+
+
+
                 }
             }
+
 
             sseTotal[0] = residualDistortion;
             sseTotal[1] = residualDistortionU;
             sseTotal[2] = residualDistortionV;
         }
         else {
+
+
             reconCoeffBuffer = (uint16_t*)(&((recon_ptr->buffer_y)[(recon_ptr->origin_x << is16bit) + (recon_ptr->origin_y << is16bit) * recon_ptr->stride_y]));
             inputBuffer = &((input_picture_ptr->buffer_y)[input_picture_ptr->origin_x + input_picture_ptr->origin_y * input_picture_ptr->stride_y]);
             inputBufferBitInc = &((input_picture_ptr->buffer_bit_inc_y)[input_picture_ptr->origin_x + input_picture_ptr->origin_y * input_picture_ptr->stride_bit_inc_y]);
 
             residualDistortion = 0;
 
-            while (row_index < sequence_control_set_ptr->seq_header.max_frame_height) {
+            while (row_index < sequence_control_set_ptr->luma_height) {
+
                 columnIndex = 0;
-                while (columnIndex < sequence_control_set_ptr->seq_header.max_frame_width) {
+                while (columnIndex < sequence_control_set_ptr->luma_width) {
                     residualDistortion += (int64_t)SQR((int64_t)((((inputBuffer[columnIndex]) << 2) | ((inputBufferBitInc[columnIndex] >> 6) & 3))) - (reconCoeffBuffer[columnIndex]));
 
                     ++columnIndex;
@@ -953,6 +999,7 @@ void psnr_calculations(
             residualDistortion = 0;
             row_index = 0;
             while (row_index < sequence_control_set_ptr->chroma_height) {
+
                 columnIndex = 0;
                 while (columnIndex < sequence_control_set_ptr->chroma_width) {
                     residualDistortion += (int64_t)SQR((int64_t)((((inputBuffer[columnIndex]) << 2) | ((inputBufferBitInc[columnIndex] >> 6) & 3))) - (reconCoeffBuffer[columnIndex]));
@@ -975,6 +1022,7 @@ void psnr_calculations(
             row_index = 0;
 
             while (row_index < sequence_control_set_ptr->chroma_height) {
+
                 columnIndex = 0;
                 while (columnIndex < sequence_control_set_ptr->chroma_width) {
                     residualDistortion += (int64_t)SQR((int64_t)((((inputBuffer[columnIndex]) << 2) | ((inputBufferBitInc[columnIndex] >> 6) & 3))) - (reconCoeffBuffer[columnIndex]));
@@ -988,7 +1036,9 @@ void psnr_calculations(
             }
 
             sseTotal[2] = residualDistortion;
+
         }
+
 
         picture_control_set_ptr->parent_pcs_ptr->luma_sse = (uint32_t)sseTotal[0];
         picture_control_set_ptr->parent_pcs_ptr->cr_sse = (uint32_t)sseTotal[1];
@@ -1001,6 +1051,7 @@ void PadRefAndSetFlags(
     SequenceControlSet   *sequence_control_set_ptr
 )
 {
+
     EbReferenceObject   *referenceObject = (EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr;
     EbPictureBufferDesc *refPicPtr = (EbPictureBufferDesc*)referenceObject->reference_picture;
     EbPictureBufferDesc *refPic16BitPtr = (EbPictureBufferDesc*)referenceObject->reference_picture16bit;
@@ -1064,7 +1115,8 @@ void PadRefAndSetFlags(
             refPic16BitPtr->origin_x,
             refPic16BitPtr->origin_y >> 1);
 
-        // Hsan: unpack ref samples (to be used @ MD)
+#if UNPACK_REF_POST_EP 
+        // Hsan: unpack ref samples (to be used @ MD) 
         un_pack2d(
             (uint16_t*) refPic16BitPtr->buffer_y,
             refPic16BitPtr->stride_y,
@@ -1097,7 +1149,13 @@ void PadRefAndSetFlags(
             (refPic16BitPtr->width + (refPicPtr->origin_x << 1)) >> 1,
             (refPic16BitPtr->height + (refPicPtr->origin_y << 1)) >> 1,
             sequence_control_set_ptr->static_config.asm_type);
+#endif
     }
+#if !OPT_LOSSLESS_1
+    // set up TMVP flag for the reference picture
+
+    referenceObject->tmvp_enable_flag = (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag) ? EB_TRUE : EB_FALSE;
+#endif
     // set up the ref POC
     referenceObject->ref_poc = picture_control_set_ptr->parent_pcs_ptr->picture_number;
 
@@ -1111,6 +1169,8 @@ void PadRefAndSetFlags(
 
     // set up the Slice Type
     referenceObject->slice_type = picture_control_set_ptr->parent_pcs_ptr->slice_type;
+
+
 }
 
 void CopyStatisticsToRefObject(
@@ -1118,15 +1178,34 @@ void CopyStatisticsToRefObject(
     SequenceControlSet   *sequence_control_set_ptr
 )
 {
-    picture_control_set_ptr->intra_coded_area = (100 * picture_control_set_ptr->intra_coded_area) / (sequence_control_set_ptr->seq_header.max_frame_width * sequence_control_set_ptr->seq_header.max_frame_height);
+    picture_control_set_ptr->intra_coded_area = (100 * picture_control_set_ptr->intra_coded_area) / (sequence_control_set_ptr->luma_width * sequence_control_set_ptr->luma_height);
     if (picture_control_set_ptr->slice_type == I_SLICE)
         picture_control_set_ptr->intra_coded_area = 0;
 
     ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->intra_coded_area = (uint8_t)(picture_control_set_ptr->intra_coded_area);
 
     uint32_t sb_index;
-    for (sb_index = 0; sb_index < picture_control_set_ptr->sb_total_count; ++sb_index)
+    for (sb_index = 0; sb_index < picture_control_set_ptr->sb_total_count; ++sb_index) {
         ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->non_moving_index_array[sb_index] = picture_control_set_ptr->parent_pcs_ptr->non_moving_index_array[sb_index];
+    }
+#if !DISABLE_OIS_USE
+    EbReferenceObject  * refObjL0, *refObjL1;
+    ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->penalize_skipflag = EB_FALSE;
+    if (picture_control_set_ptr->slice_type == B_SLICE) {
+        //MRP_MD
+        refObjL0 = (EbReferenceObject*)picture_control_set_ptr->ref_pic_ptr_array[REF_LIST_0]->object_ptr;
+        refObjL1 = (EbReferenceObject*)picture_control_set_ptr->ref_pic_ptr_array[REF_LIST_1]->object_ptr;
+
+        if (picture_control_set_ptr->temporal_layer_index == 0) {
+            if (picture_control_set_ptr->parent_pcs_ptr->intra_coded_block_probability > 30) {
+                ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->penalize_skipflag = EB_TRUE;
+            }
+        }
+        else {
+            ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->penalize_skipflag = (refObjL0->penalize_skipflag || refObjL1->penalize_skipflag) ? EB_TRUE : EB_FALSE;
+        }
+    }
+#endif
     ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->tmp_layer_idx = (uint8_t)picture_control_set_ptr->temporal_layer_index;
     ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->is_scene_change = picture_control_set_ptr->parent_pcs_ptr->scene_change_flag;
 
@@ -1136,6 +1215,69 @@ void CopyStatisticsToRefObject(
     ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->sg_frame_ep = cm->sg_frame_ep;
 }
 
+#if !MEMORY_FOOTPRINT_OPT  
+EbErrorType QpmDeriveWeightsMinAndMax(
+    PictureControlSet                    *picture_control_set_ptr,
+    EncDecContext                        *context_ptr)
+{
+    EbErrorType                    return_error = EB_ErrorNone;
+    uint32_t cu_depth;
+    context_ptr->min_delta_qp_weight = encMinDeltaQpWeightTab[picture_control_set_ptr->temporal_layer_index];
+    context_ptr->max_delta_qp_weight = encMaxDeltaQpWeightTab[picture_control_set_ptr->temporal_layer_index];
+    //qpm_derive_delta_qp_map_weights
+
+
+    EbBool adjust_min_qp_flag = EB_FALSE;
+
+    adjust_min_qp_flag = picture_control_set_ptr->adjust_min_qp_flag;
+    context_ptr->min_delta_qp_weight = 100;
+    context_ptr->max_delta_qp_weight = 100;
+
+    {
+        if (picture_control_set_ptr->slice_type == I_SLICE) {
+            if (picture_control_set_ptr->parent_pcs_ptr->percentage_of_edgein_light_background > 0 && picture_control_set_ptr->parent_pcs_ptr->percentage_of_edgein_light_background <= 3
+                && !adjust_min_qp_flag && picture_control_set_ptr->parent_pcs_ptr->dark_back_groundlight_fore_ground) {
+                context_ptr->min_delta_qp_weight = 100;
+            }
+            else {
+                if (adjust_min_qp_flag) {
+
+
+                    context_ptr->min_delta_qp_weight = 250;
+
+                }
+                else if (picture_control_set_ptr->parent_pcs_ptr->pic_homogenous_over_time_sb_percentage > 30) {
+
+                    context_ptr->min_delta_qp_weight = 150;
+                    context_ptr->max_delta_qp_weight = 50;
+                }
+            }
+        }
+        else {
+            if (adjust_min_qp_flag) {
+                context_ptr->min_delta_qp_weight = 170;
+            }
+        }
+        if (picture_control_set_ptr->parent_pcs_ptr->high_dark_area_density_flag) {
+            context_ptr->min_delta_qp_weight = 25;
+            context_ptr->max_delta_qp_weight = 25;
+        }
+    }
+
+    // Refine max_delta_qp_weight; apply conservative max_degrade_weight when most of the picture is homogenous over time.
+    if (picture_control_set_ptr->parent_pcs_ptr->pic_homogenous_over_time_sb_percentage > 90) {
+        context_ptr->max_delta_qp_weight = context_ptr->max_delta_qp_weight >> 1;
+    }
+
+
+    for (cu_depth = 0; cu_depth < 4; cu_depth++) {
+        context_ptr->min_delta_qp[cu_depth] = picture_control_set_ptr->slice_type == I_SLICE ? encMinDeltaQpISliceTab[cu_depth] : encMinDeltaQpTab[cu_depth][picture_control_set_ptr->temporal_layer_index];
+        context_ptr->max_delta_qp[cu_depth] = encMaxDeltaQpTab[cu_depth][picture_control_set_ptr->temporal_layer_index];
+    }
+
+    return return_error;
+}
+#endif
 /******************************************************
 * Derive EncDec Settings for OQ
 Input   : encoder mode and tune
@@ -1143,8 +1285,10 @@ Output  : EncDec Kernel signal(s)
 ******************************************************/
 EbErrorType signal_derivation_enc_dec_kernel_oq(
     SequenceControlSet    *sequence_control_set_ptr,
+
     PictureControlSet     *picture_control_set_ptr,
     ModeDecisionContext   *context_ptr) {
+
     EbErrorType return_error = EB_ErrorNone;
 
     // NFL Level MD       Settings
@@ -1154,8 +1298,10 @@ EbErrorType signal_derivation_enc_dec_kernel_oq(
     // 3                  10
     // 4                  8
     // 5                  6
-    // 6                  4
-    // 7                  3
+    // 6                  4  
+    // 7                  3 
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
@@ -1170,6 +1316,7 @@ EbErrorType signal_derivation_enc_dec_kernel_oq(
             else
                 context_ptr->nfl_level = 7;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M1)
         if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
             context_ptr->nfl_level = (sequence_control_set_ptr->input_resolution <= INPUT_SIZE_576p_RANGE_OR_LOWER) ? 0 : 1;
@@ -1192,12 +1339,49 @@ EbErrorType signal_derivation_enc_dec_kernel_oq(
             context_ptr->nfl_level = 6;
         else
             context_ptr->nfl_level = 7;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+#if MOD_M0
+        context_ptr->nfl_level = 2;
+#else
+        if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
+            context_ptr->nfl_level = (sequence_control_set_ptr->input_resolution <= INPUT_SIZE_576p_RANGE_OR_LOWER) ? 0 : 1;
+        else
+            context_ptr->nfl_level = 2;
+#endif
+    else if (picture_control_set_ptr->enc_mode <= ENC_M1)
+        if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
+            context_ptr->nfl_level = 2;
+        else
+            context_ptr->nfl_level = 3;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M3)
+        if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
+            context_ptr->nfl_level = 2;
+        else
+            context_ptr->nfl_level = 4;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M5)
+        if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
+            context_ptr->nfl_level = 4;
+        else
+            context_ptr->nfl_level = 5;
+    else if(picture_control_set_ptr->enc_mode <= ENC_M7)
+        context_ptr->nfl_level = 5;
+    else
+        if (picture_control_set_ptr->parent_pcs_ptr->slice_type == I_SLICE)
+            context_ptr->nfl_level  = 5;
+        else if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag)
+            context_ptr->nfl_level  = 6;
+        else
+            context_ptr->nfl_level  = 7;
+#endif
     // Set Chroma Mode
     // Level                Settings
     // CHROMA_MODE_0  0     Full chroma search @ MD
     // CHROMA_MODE_1  1     Fast chroma search @ MD
     // CHROMA_MODE_2  2     Chroma blind @ MD + CFL @ EP
     // CHROMA_MODE_3  3     Chroma blind @ MD + no CFL @ EP
+#if SEARCH_UV_MODE    
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M6)
             context_ptr->chroma_level = CHROMA_MODE_1;
@@ -1209,179 +1393,307 @@ EbErrorType signal_derivation_enc_dec_kernel_oq(
                 CHROMA_MODE_2 :
                 CHROMA_MODE_3;
     else
-    if (MR_MODE)
-        context_ptr->chroma_level = CHROMA_MODE_0;
-    else
+#endif
+#if SEARCH_UV_BASE
     if (picture_control_set_ptr->enc_mode == ENC_M0 && picture_control_set_ptr->temporal_layer_index == 0)
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+#endif
         context_ptr->chroma_level = CHROMA_MODE_0;
-    else
+    else 
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M4)
         context_ptr->chroma_level = CHROMA_MODE_1;
-    else
+    else 
         context_ptr->chroma_level = (sequence_control_set_ptr->encoder_bit_depth == EB_8BIT) ?
             CHROMA_MODE_2 :
             CHROMA_MODE_3 ;
 
+    
     // Set fast loop method
-    // 1 fast loop: SSD_SEARCH not supported
+    // 1 fast loop: SSD_SEARCH not supported    
     // Level                Settings
     //  0                   Collapsed fast loop
-    //  1                   Decoupled fast loops ( intra/inter)
+    //  1                   Decoupled fast loops ( intra/inter) 
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->decouple_intra_inter_fast_loop = 0;
         else
             context_ptr->decouple_intra_inter_fast_loop = 1;
     else
+#endif
     context_ptr->decouple_intra_inter_fast_loop = 0;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+        context_ptr->decouple_intra_inter_fast_loop = 0;
+    else
+        context_ptr->decouple_intra_inter_fast_loop = 1;
+#endif
 
-    // Set the search method when decoupled fast loop is used
+    // Set the search method when decoupled fast loop is used 
     // Hsan: FULL_SAD_SEARCH not supported
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->decoupled_fast_loop_search_method = SSD_SEARCH;
         else
             context_ptr->decoupled_fast_loop_search_method = FULL_SAD_SEARCH;
     else
+#endif
         if (picture_control_set_ptr->enc_mode <= ENC_M4)
             context_ptr->decoupled_fast_loop_search_method = SSD_SEARCH;
         else
             context_ptr->decoupled_fast_loop_search_method = FULL_SAD_SEARCH;
+#else
+    if (picture_control_set_ptr->enc_mode <= ENC_M5)
+        context_ptr->decoupled_fast_loop_search_method = SSD_SEARCH;
+    else
+        context_ptr->decoupled_fast_loop_search_method = FULL_SAD_SEARCH;
+#endif
 
     // Set the full loop escape level
     // Level                Settings
     // 0                    Off
     // 1                    On but only INTRA
     // 2                    On both INTRA and INTER
+#if M9_FULL_LOOP_ESCAPE
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->full_loop_escape = 0;
         else
             context_ptr->full_loop_escape = 2;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M5)
         context_ptr->full_loop_escape = 0;
     else
         context_ptr->full_loop_escape = 2;
+#else
+    if (picture_control_set_ptr->enc_mode <= ENC_M7)
+        context_ptr->full_loop_escape = 0;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M8)
+        context_ptr->full_loop_escape = 1;
+    else
+        context_ptr->full_loop_escape = 2;
+#endif
+#else
+    if (picture_control_set_ptr->enc_mode <= ENC_M7)
+        context_ptr->full_loop_escape = 0;
+    else
+        context_ptr->full_loop_escape = 1;
+#endif
+
 
     // Set global MV injection
     // Level                Settings
     // 0                    Injection off (Hsan: but not derivation as used by MV ref derivation)
     // 1                    On
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->global_mv_injection = 1;
         else
             context_ptr->global_mv_injection = 0;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M7)
         context_ptr->global_mv_injection = 1;
     else
         context_ptr->global_mv_injection = 0;
 
-    if (picture_control_set_ptr->enc_mode == ENC_M0)
-        context_ptr->new_nearest_near_comb_injection = 1;
+#if M9_NEAR_INJECTION
+    // Set NEAR injection
+    // Level                Settings
+    // 0                    Off
+    // 1                    On
+    if (picture_control_set_ptr->enc_mode <= ENC_M8)
+        context_ptr->near_mv_injection = 1;
     else
-        context_ptr->new_nearest_near_comb_injection = 0;
-    if (picture_control_set_ptr->enc_mode == ENC_M0)
-        context_ptr->nx4_4xn_parent_mv_injection = 1;
-    else
-        context_ptr->nx4_4xn_parent_mv_injection = 0;
-
+        //context_ptr->near_mv_injection = 0;
+        context_ptr->near_mv_injection =
+        (picture_control_set_ptr->temporal_layer_index == 0) ?
+            1 :
+            0;
+#endif
+    
     // Set warped motion injection
     // Level                Settings
     // 0                    OFF
     // 1                    On
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->warped_motion_injection = 1;
         else
             context_ptr->warped_motion_injection = 0;
     else
+#endif
     context_ptr->warped_motion_injection = 1;
+#else
+    if (picture_control_set_ptr->enc_mode <= ENC_M5)
+        context_ptr->warped_motion_injection = 1;
+    else
+        context_ptr->warped_motion_injection = 0;
+#endif
 
     // Set unipred3x3 injection
     // Level                Settings
     // 0                    OFF
     // 1                    ON FULL
     // 2                    Reduced set
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->unipred3x3_injection = 1;
         else
             context_ptr->unipred3x3_injection = 0;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M1)
         context_ptr->unipred3x3_injection = 1;
     else if (picture_control_set_ptr->enc_mode <= ENC_M4)
         context_ptr->unipred3x3_injection = 2;
     else
         context_ptr->unipred3x3_injection = 0;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+        context_ptr->unipred3x3_injection = 1;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M3)
+        context_ptr->unipred3x3_injection = 2;
+    else
+        context_ptr->unipred3x3_injection = 0;
+#endif
 
+    
     // Set bipred3x3 injection
     // Level                Settings
     // 0                    OFF
     // 1                    ON FULL
     // 2                    Reduced set
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->bipred3x3_injection = 1;
         else
             context_ptr->bipred3x3_injection = 0;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M1)
         context_ptr->bipred3x3_injection = 1;
     else if (picture_control_set_ptr->enc_mode <= ENC_M4)
         context_ptr->bipred3x3_injection = 2;
     else
         context_ptr->bipred3x3_injection = 0;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+        context_ptr->bipred3x3_injection = 1;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M3)
+        context_ptr->bipred3x3_injection = 2;
+    else
+        context_ptr->bipred3x3_injection = 0;
+#endif
 
     // Set interpolation filter search blk size
     // Level                Settings
     // 0                    ON for 8x8 and above
     // 1                    ON for 16x16 and above
     // 2                    ON for 32x32 and above
+#if NEW_PRESETS
     if (picture_control_set_ptr->enc_mode <= ENC_M4)
         context_ptr->interpolation_filter_search_blk_size = 0;
     else
         context_ptr->interpolation_filter_search_blk_size = 1;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0)
+        context_ptr->interpolation_filter_search_blk_size = 0;
+    else if (picture_control_set_ptr->enc_mode <= ENC_M2)
+        context_ptr->interpolation_filter_search_blk_size = 1;
+    else        
+        context_ptr->interpolation_filter_search_blk_size = 2;
+#endif
 
+#if PF_N2_SUPPORT
     // Set PF MD
     context_ptr->pf_md_mode = PF_OFF;
+#endif
 
+#if SPATIAL_SSE
     // Derive Spatial SSE Flag
+#if NEW_PRESETS
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M6)
             context_ptr->spatial_sse_full_loop = EB_TRUE;
         else
             context_ptr->spatial_sse_full_loop = EB_FALSE;
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M4)
         context_ptr->spatial_sse_full_loop = EB_TRUE;
     else
         context_ptr->spatial_sse_full_loop = EB_FALSE;
+#else
+    if (picture_control_set_ptr->enc_mode == ENC_M0) 
+#if MOD_M0
+        context_ptr->spatial_sse_full_loop = EB_FALSE;
+#else
+        context_ptr->spatial_sse_full_loop = EB_TRUE;
+#endif
+    else
+        context_ptr->spatial_sse_full_loop = EB_FALSE;
+#endif
+#endif
 
+#if M9_INTER_SRC_SRC_FAST_LOOP
+    // Derive Spatial SSE Flag
+    if (picture_control_set_ptr->enc_mode <= ENC_M8)
+        context_ptr->inter_fast_loop_src_src = 0;
+    else
+        context_ptr->inter_fast_loop_src_src = 1;
+#endif
+
+#if BLK_SKIP_DECISION
+#if NEW_PRESETS
     if (context_ptr->chroma_level <= CHROMA_MODE_1)
         context_ptr->blk_skip_decision = EB_TRUE;
     else
         context_ptr->blk_skip_decision = EB_FALSE;
+#else
+        context_ptr->blk_skip_decision = EB_TRUE;
+#endif
+#endif
+
+#if OPT_QUANT_COEFF
     // Derive Trellis Quant Coeff Optimization Flag
     if (picture_control_set_ptr->enc_mode == ENC_M0)
         context_ptr->trellis_quant_coeff_optimization = EB_TRUE;
     else
         context_ptr->trellis_quant_coeff_optimization = EB_FALSE;
+#endif
 
+#if NEW_PRESETS
     // Derive redundant block
+#if SCREEN_CONTENT_SETTINGS
     if (picture_control_set_ptr->parent_pcs_ptr->sc_content_detected)
         if (picture_control_set_ptr->enc_mode <= ENC_M1)
             context_ptr->redundant_blk = EB_TRUE;
         else
-            context_ptr->redundant_blk = EB_FALSE;
+            context_ptr->redundant_blk = EB_FALSE;  
     else
+#endif
     if (picture_control_set_ptr->enc_mode <= ENC_M5)
         context_ptr->redundant_blk = EB_TRUE;
     else
         context_ptr->redundant_blk = EB_FALSE;
+#endif
 
     return return_error;
 }
@@ -1390,9 +1702,11 @@ void move_cu_data(
     CodingUnit *src_cu,
     CodingUnit *dst_cu);
 
+#if CABAC_UP
 void av1_estimate_syntax_rate___partial(
     MdRateEstimationContext        *md_rate_estimation_array,
     FRAME_CONTEXT                  *fc);
+#endif
 /******************************************************
  * EncDec Kernel
  ******************************************************/
@@ -1442,6 +1756,7 @@ void* enc_dec_kernel(void *input_ptr)
     uint32_t                                 segmentBandSize;
     EncDecSegments                          *segments_ptr;
     for (;;) {
+
         // Get Mode Decision Results
         eb_get_full_object(
             context_ptr->mode_decision_input_fifo_ptr,
@@ -1467,7 +1782,7 @@ void* enc_dec_kernel(void *input_ptr)
         sb_sz = (uint8_t)sequence_control_set_ptr->sb_size_pix;
         lcuSizeLog2 = (uint8_t)Log2f(sb_sz);
         context_ptr->sb_sz = sb_sz;
-        picture_width_in_sb = (sequence_control_set_ptr->seq_header.max_frame_width + sb_sz - 1) >> lcuSizeLog2;
+        picture_width_in_sb = (sequence_control_set_ptr->luma_width + sb_sz - 1) >> lcuSizeLog2;
         endOfRowFlag = EB_FALSE;
         lcuRowIndexStart = lcuRowIndexCount = 0;
         context_ptr->tot_intra_coded_area = 0;
@@ -1488,9 +1803,7 @@ void* enc_dec_kernel(void *input_ptr)
             reset_mode_decision( // HT done
                 context_ptr->md_context,
                 picture_control_set_ptr,
-#if !ENABLE_CDF_UPDATE
                 sequence_control_set_ptr,
-#endif
                 segment_index);
 
             // Reset EncDec Coding State
@@ -1500,10 +1813,19 @@ void* enc_dec_kernel(void *input_ptr)
                 sequence_control_set_ptr,
                 segment_index);
 
-            if (picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr != NULL)
+            if (picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr != NULL) {
                 ((EbReferenceObject  *)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->average_intensity = picture_control_set_ptr->parent_pcs_ptr->average_intensity[0];
+            }
+#if !MEMORY_FOOTPRINT_OPT
+            if (sequence_control_set_ptr->static_config.improve_sharpness) {
+                QpmDeriveWeightsMinAndMax(
+                    picture_control_set_ptr,
+                    context_ptr);
+            }
+#endif
             for (y_lcu_index = yLcuStartIndex, lcuSegmentIndex = lcuStartIndex; lcuSegmentIndex < lcuStartIndex + lcuSegmentCount; ++y_lcu_index) {
                 for (x_lcu_index = xLcuStartIndex; x_lcu_index < picture_width_in_sb && (x_lcu_index + y_lcu_index < segmentBandSize) && lcuSegmentIndex < lcuStartIndex + lcuSegmentCount; ++x_lcu_index, ++lcuSegmentIndex) {
+
                     sb_index = (uint16_t)(y_lcu_index * picture_width_in_sb + x_lcu_index);
                     sb_ptr = picture_control_set_ptr->sb_ptr_array[sb_index];
                     sb_origin_x = x_lcu_index << lcuSizeLog2;
@@ -1516,26 +1838,26 @@ void* enc_dec_kernel(void *input_ptr)
                     context_ptr->sb_index = sb_index;
                     context_ptr->md_context->cu_use_ref_src_flag = (picture_control_set_ptr->parent_pcs_ptr->use_src_ref) && (picture_control_set_ptr->parent_pcs_ptr->edge_results_ptr[sb_index].edge_block_num == EB_FALSE || picture_control_set_ptr->parent_pcs_ptr->sb_flat_noise_array[sb_index]) ? EB_TRUE : EB_FALSE;
 
+#if CABAC_UP
                     if (picture_control_set_ptr->update_cdf) {
-#if ENABLE_CDF_UPDATE
-                        picture_control_set_ptr->rate_est_array[sb_index] = *picture_control_set_ptr->md_rate_estimation_array;
-#else
+
                         MdRateEstimationContext* md_rate_estimation_array = sequence_control_set_ptr->encode_context_ptr->md_rate_estimation_array;
                         md_rate_estimation_array += picture_control_set_ptr->slice_type * TOTAL_NUMBER_OF_QP_VALUES + context_ptr->md_context->qp;
 
                         //this is temp, copy all default tables
                         picture_control_set_ptr->rate_est_array[sb_index] = *md_rate_estimation_array;
-#endif
 #if CABAC_SERIAL
                         if (sb_index == 0)
                             picture_control_set_ptr->ec_ctx_array[sb_index] = *picture_control_set_ptr->coeff_est_entropy_coder_ptr->fc;
                         else
                             picture_control_set_ptr->ec_ctx_array[sb_index] = picture_control_set_ptr->ec_ctx_array[sb_index - 1];
 #else
-                        if (sb_origin_x == 0)
+                        if (sb_origin_x == 0) {
                             picture_control_set_ptr->ec_ctx_array[sb_index] = *picture_control_set_ptr->coeff_est_entropy_coder_ptr->fc;
-                        else
+                        }
+                        else {
                             picture_control_set_ptr->ec_ctx_array[sb_index] = picture_control_set_ptr->ec_ctx_array[sb_index - 1];
+                        }
 #endif
 
                         //construct the tables using the latest CDFs : Coeff Only here ---to check if I am using all the uptodate CDFs here
@@ -1549,9 +1871,12 @@ void* enc_dec_kernel(void *input_ptr)
 
                         //let the candidate point to the new rate table.
                         uint32_t  candidateIndex;
-                        for (candidateIndex = 0; candidateIndex < MODE_DECISION_CANDIDATE_MAX_COUNT; ++candidateIndex)
+                        for (candidateIndex = 0; candidateIndex < MODE_DECISION_CANDIDATE_MAX_COUNT; ++candidateIndex) {
                             context_ptr->md_context->fast_candidate_ptr_array[candidateIndex]->md_rate_estimation_ptr = &picture_control_set_ptr->rate_est_array[sb_index];
+                        }
+
                     }
+#endif
                     // Configure the LCU
                     mode_decision_configure_lcu(
                         context_ptr->md_context,
@@ -1563,6 +1888,7 @@ void* enc_dec_kernel(void *input_ptr)
 
                     uint32_t lcuRow;
                     if (picture_control_set_ptr->parent_pcs_ptr->enable_in_loop_motion_estimation_flag) {
+
                         EbPictureBufferDesc       *input_picture_ptr;
 
                         input_picture_ptr = picture_control_set_ptr->parent_pcs_ptr->enhanced_picture_ptr;
@@ -1571,12 +1897,13 @@ void* enc_dec_kernel(void *input_ptr)
                         uint32_t bufferIndex = (input_picture_ptr->origin_y + sb_origin_y) * input_picture_ptr->stride_y + input_picture_ptr->origin_x + sb_origin_x;
 
                         // Copy the source superblock to the me local buffer
-                        uint32_t sb_height = (sequence_control_set_ptr->seq_header.max_frame_height - sb_origin_y) < MAX_SB_SIZE ? sequence_control_set_ptr->seq_header.max_frame_height - sb_origin_y : MAX_SB_SIZE;
-                        uint32_t sb_width = (sequence_control_set_ptr->seq_header.max_frame_width - sb_origin_x) < MAX_SB_SIZE ? sequence_control_set_ptr->seq_header.max_frame_width - sb_origin_x : MAX_SB_SIZE;
+                        uint32_t sb_height = (sequence_control_set_ptr->luma_height - sb_origin_y) < MAX_SB_SIZE ? sequence_control_set_ptr->luma_height - sb_origin_y : MAX_SB_SIZE;
+                        uint32_t sb_width = (sequence_control_set_ptr->luma_width - sb_origin_x) < MAX_SB_SIZE ? sequence_control_set_ptr->luma_width - sb_origin_x : MAX_SB_SIZE;
                         uint32_t is_complete_sb = sequence_control_set_ptr->sb_geom[sb_index].is_complete_sb;
 
-                        if (!is_complete_sb)
+                        if (!is_complete_sb) {
                             memset(context_ptr->ss_mecontext->sb_buffer, 0, MAX_SB_SIZE*MAX_SB_SIZE);
+                        }
                         for (lcuRow = 0; lcuRow < sb_height; lcuRow++) {
                             EB_MEMCPY((&(context_ptr->ss_mecontext->sb_buffer[lcuRow * MAX_SB_SIZE])), (&(input_picture_ptr->buffer_y[bufferIndex + lcuRow * input_picture_ptr->stride_y])), sb_width * sizeof(uint8_t));
                         }
@@ -1588,11 +1915,49 @@ void* enc_dec_kernel(void *input_ptr)
                         int16_t mv_l0_y;
                         int16_t mv_l1_x;
                         int16_t mv_l1_y;
-
+                        
+#if MRP_ME
                         mv_l0_x = 0;
                         mv_l0_y = 0;
                         mv_l1_x = 0;
                         mv_l1_y = 0;
+#else
+                        uint32_t me_sb_addr;
+                        if (sequence_control_set_ptr->sb_size == BLOCK_128X128) {
+
+                            uint32_t me_sb_size = sequence_control_set_ptr->sb_sz;
+                            uint32_t me_pic_width_in_sb = (sequence_control_set_ptr->luma_width + me_sb_size - 1) / me_sb_size;
+                            uint32_t me_pic_height_in_sb = (sequence_control_set_ptr->luma_height + me_sb_size - 1) / me_sb_size;
+                            uint32_t me_sb_x = (sb_origin_x / me_sb_size);
+                            uint32_t me_sb_y = (sb_origin_y / me_sb_size);
+                            uint32_t me_sb_addr_0 = me_sb_x + me_sb_y * me_pic_width_in_sb;
+                            uint32_t me_sb_addr_1 = (me_sb_x + 1) < me_pic_width_in_sb ? (me_sb_x + 1) + ((me_sb_y + 0) * me_pic_width_in_sb) : me_sb_addr_0;
+                            uint32_t me_sb_addr_2 = (me_sb_y + 1) < me_pic_height_in_sb ? (me_sb_x + 0) + ((me_sb_y + 1) * me_pic_width_in_sb) : me_sb_addr_0;
+                            uint32_t me_sb_addr_3 = ((me_sb_x + 1) < me_pic_width_in_sb) && ((me_sb_y + 1) < me_pic_height_in_sb) ? (me_sb_x + 1) + ((me_sb_y + 1) * me_pic_width_in_sb) : me_sb_addr_0;
+
+                            MeCuResults * me_block_results_0 = &picture_control_set_ptr->parent_pcs_ptr->me_results[me_sb_addr_0][0];
+                            MeCuResults * me_block_results_1 = &picture_control_set_ptr->parent_pcs_ptr->me_results[me_sb_addr_1][0];
+                            MeCuResults * me_block_results_2 = &picture_control_set_ptr->parent_pcs_ptr->me_results[me_sb_addr_2][0];
+                            MeCuResults * me_block_results_3 = &picture_control_set_ptr->parent_pcs_ptr->me_results[me_sb_addr_3][0];
+
+                            // Compute average open_loop 64x64 mvs
+                            mv_l0_x = ((me_block_results_0->x_mv_l0 + me_block_results_1->x_mv_l0 + me_block_results_2->x_mv_l0 + me_block_results_3->x_mv_l0) >> 2) >> 2;
+                            mv_l0_y = ((me_block_results_0->y_mv_l0 + me_block_results_1->y_mv_l0 + me_block_results_2->y_mv_l0 + me_block_results_3->y_mv_l0) >> 2) >> 2;
+                            mv_l1_x = ((me_block_results_0->x_mv_l1 + me_block_results_1->x_mv_l1 + me_block_results_2->x_mv_l1 + me_block_results_3->x_mv_l1) >> 2) >> 2;
+                            mv_l1_y = ((me_block_results_0->y_mv_l1 + me_block_results_1->y_mv_l1 + me_block_results_2->y_mv_l1 + me_block_results_3->y_mv_l1) >> 2) >> 2;
+
+                        }
+                        else {
+                            me_sb_addr = sb_index;
+                            MeCuResults * mePuResult = &picture_control_set_ptr->parent_pcs_ptr->me_results[me_sb_addr][0];
+
+                            mv_l0_x = mePuResult->x_mv_l0 >> 2;
+                            mv_l0_y = mePuResult->y_mv_l0 >> 2;
+                            mv_l1_x = mePuResult->x_mv_l1 >> 2;
+                            mv_l1_y = mePuResult->y_mv_l1 >> 2;
+                        }
+#endif
+
 
                         context_ptr->ss_mecontext->search_area_width = 64;
                         context_ptr->ss_mecontext->search_area_height = 64;
@@ -1619,6 +1984,7 @@ void* enc_dec_kernel(void *input_ptr)
                         sb_index,
                         context_ptr->ss_mecontext,
                         context_ptr->md_context);
+
 
                     // Configure the LCU
                     EncDecConfigureLcu(
@@ -1648,11 +2014,16 @@ void* enc_dec_kernel(void *input_ptr)
                         sb_index,
                         sb_origin_x,
                         sb_origin_y,
+#if !MEMORY_FOOTPRINT_OPT
+                        sb_ptr->qp,
+#endif
                         context_ptr);
 #endif
 
-                    if (picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr != NULL)
+                    if (picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr != NULL) {
                         ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->intra_coded_area_sb[sb_index] = (uint8_t)((100 * context_ptr->intra_coded_area_sb[sb_index]) / (64 * 64));
+                    }
+
                 }
                 xLcuStartIndex = (xLcuStartIndex > 0) ? xLcuStartIndex - 1 : 0;
             }
@@ -1663,28 +2034,31 @@ void* enc_dec_kernel(void *input_ptr)
         eb_release_mutex(picture_control_set_ptr->intra_mutex);
 
         if (lastLcuFlag) {
+
             // Copy film grain data from parent picture set to the reference object for further reference
-            if (sequence_control_set_ptr->seq_header.film_grain_params_present)
+            if (sequence_control_set_ptr->film_grain_params_present)
             {
+
                 if (picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE && picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr) {
+
                     ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->film_grain_params
-                        = picture_control_set_ptr->parent_pcs_ptr->frm_hdr.film_grain_params;
+                        = picture_control_set_ptr->parent_pcs_ptr->film_grain_params;
                 }
             }
-#if ENABLE_CDF_UPDATE
-            if (picture_control_set_ptr->parent_pcs_ptr->frame_end_cdf_update_mode && picture_control_set_ptr->parent_pcs_ptr->is_used_as_reference_flag == EB_TRUE && picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr)
-                for (int frame = LAST_FRAME; frame <= ALTREF_FRAME; ++frame)
-                    ((EbReferenceObject*)picture_control_set_ptr->parent_pcs_ptr->reference_picture_wrapper_ptr->object_ptr)->global_motion[frame]
-                    = picture_control_set_ptr->parent_pcs_ptr->global_motion[frame];
-#endif
+
             EB_MEMCPY(picture_control_set_ptr->parent_pcs_ptr->av1x->sgrproj_restore_cost, context_ptr->md_rate_estimation_ptr->sgrproj_restore_fac_bits, 2 * sizeof(int32_t));
             EB_MEMCPY(picture_control_set_ptr->parent_pcs_ptr->av1x->switchable_restore_cost, context_ptr->md_rate_estimation_ptr->switchable_restore_fac_bits, 3 * sizeof(int32_t));
             EB_MEMCPY(picture_control_set_ptr->parent_pcs_ptr->av1x->wiener_restore_cost, context_ptr->md_rate_estimation_ptr->wiener_restore_fac_bits, 2 * sizeof(int32_t));
             picture_control_set_ptr->parent_pcs_ptr->av1x->rdmult = context_ptr->full_lambda;
+
+
         }
+
+
 
         if (lastLcuFlag)
         {
+
             // Get Empty EncDec Results
             eb_get_empty_object(
                 context_ptr->enc_dec_output_fifo_ptr,
@@ -1693,17 +2067,19 @@ void* enc_dec_kernel(void *input_ptr)
             encDecResultsPtr->picture_control_set_wrapper_ptr = encDecTasksPtr->picture_control_set_wrapper_ptr;
             //CHKN these are not needed for DLF
             encDecResultsPtr->completed_lcu_row_index_start = 0;
-            encDecResultsPtr->completed_lcu_row_count = ((sequence_control_set_ptr->seq_header.max_frame_height + sequence_control_set_ptr->sb_size_pix - 1) >> lcuSizeLog2);
+            encDecResultsPtr->completed_lcu_row_count = ((sequence_control_set_ptr->luma_height + sequence_control_set_ptr->sb_size_pix - 1) >> lcuSizeLog2);
             // Post EncDec Results
             eb_post_full_object(encDecResultsWrapperPtr);
+
         }
         // Release Mode Decision Results
         eb_release_object(encDecTasksWrapperPtr);
+
     }
     return EB_NULL;
 }
 
-void eb_av1_add_film_grain(EbPictureBufferDesc *src,
+void av1_add_film_grain(EbPictureBufferDesc *src,
     EbPictureBufferDesc *dst,
     aom_film_grain_t *film_grain_ptr) {
     uint8_t *luma, *cb, *cr;
@@ -1767,7 +2143,7 @@ void eb_av1_add_film_grain(EbPictureBufferDesc *src,
     width = dst->width;
     height = dst->height;
 
-    eb_av1_add_film_grain_run(&params, luma, cb, cr, height, width, luma_stride,
+    av1_add_film_grain_run(&params, luma, cb, cr, height, width, luma_stride,
         chroma_stride, use_high_bit_depth, chroma_subsamp_y,
         chroma_subsamp_x);
     return;

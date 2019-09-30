@@ -9,23 +9,15 @@
 #include "EbEncDecTasks.h"
 
 EbErrorType enc_dec_tasks_ctor(
-    EncDecTasks *context_ptr,
-    EbPtr object_init_data_ptr)
-{
-    (void)context_ptr;
-    (void)object_init_data_ptr;
-
-    return EB_ErrorNone;
-}
-EbErrorType enc_dec_tasks_creator(
     EbPtr *object_dbl_ptr,
     EbPtr object_init_data_ptr)
 {
-    EncDecTasks* obj;
+    EncDecTasks *context_ptr;
+    EB_MALLOC(EncDecTasks*, context_ptr, sizeof(EncDecTasks), EB_N_PTR);
 
-    *object_dbl_ptr = NULL;
-    EB_NEW(obj, enc_dec_tasks_ctor, object_init_data_ptr);
-    *object_dbl_ptr = obj;
+    *object_dbl_ptr = (EbPtr)context_ptr;
+
+    (void)object_init_data_ptr;
 
     return EB_ErrorNone;
 }

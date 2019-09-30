@@ -111,6 +111,7 @@ extern "C" {
     struct AV1Common;
     struct scale_factors;
 
+
     static INLINE ConvolveParams get_conv_params_no_round(int32_t ref, int32_t do_average,
         int32_t plane,
         ConvBufType *dst,
@@ -175,10 +176,12 @@ extern "C" {
         int32_t scaled, ConvolveParams *conv_params,
         const struct scale_factors *sf, int32_t bd);
 
+
     static INLINE const int16_t *av1_get_interp_filter_subpel_kernel(
         const InterpFilterParams filter_params, const int32_t subpel) {
         return filter_params.filter_ptr + filter_params.taps * subpel;
     }
+
 
 #ifdef __cplusplus
 }  // extern "C"

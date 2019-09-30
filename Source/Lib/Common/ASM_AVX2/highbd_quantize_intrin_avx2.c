@@ -12,7 +12,9 @@
 #include "EbDefinitions.h"
 #include <immintrin.h>
 
+
 #include "aom_dsp_rtcd.h"
+
 
 #ifdef __GNUC__
 #define LIKELY(v) __builtin_expect(v, 1)
@@ -22,7 +24,9 @@
 #define UNLIKELY(v) (v)
 #endif
 
-// Note: TranHigh is the datatype used for intermediate transform stages.
+
+ // Note:
+ // TranHigh is the datatype used for intermediate transform stages.
 typedef int64_t TranHigh;
 
 static INLINE void init_one_qp(const __m128i *p, __m256i *qp) {
@@ -34,8 +38,9 @@ static INLINE void init_one_qp(const __m128i *p, __m256i *qp) {
 
 static INLINE void update_qp(__m256i *qp) {
     int32_t i;
-    for (i = 0; i < 5; ++i)
+    for (i = 0; i < 5; ++i) {
         qp[i] = _mm256_permute2x128_si256(qp[i], qp[i], 0x11);
+    }
 }
 
 static INLINE void init_qp(const int16_t *zbin_ptr, const int16_t *round_ptr,
@@ -119,7 +124,7 @@ static INLINE void quantize(const __m256i *qp, __m256i *c,
     }
 }
 
-void eb_aom_highbd_quantize_b_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
+void aom_highbd_quantize_b_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
     int32_t skip_block, const int16_t *zbin_ptr,
     const int16_t *round_ptr,
     const int16_t *quant_ptr,
@@ -129,6 +134,7 @@ void eb_aom_highbd_quantize_b_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
     const int16_t *scan, const int16_t *iscan) {
     (void)scan;
     const uint32_t step = 8;
+
 
     if (LIKELY(!skip_block)) {
         __m256i qp[5], coeff;
@@ -266,7 +272,7 @@ static INLINE void quantize_64X64(const __m256i *qp, __m256i *c,
     }
 }
 
-void eb_aom_highbd_quantize_b_64x64_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
+void aom_highbd_quantize_b_64x64_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
     int32_t skip_block, const int16_t *zbin_ptr,
     const int16_t *round_ptr,
     const int16_t *quant_ptr,
@@ -276,6 +282,7 @@ void eb_aom_highbd_quantize_b_64x64_avx2(const TranLow *coeff_ptr, intptr_t n_co
     const int16_t *scan, const int16_t *iscan) {
     (void)scan;
     const uint32_t step = 8;
+
 
     if (LIKELY(!skip_block)) {
         __m256i qp[5], coeff;
@@ -412,7 +419,7 @@ static INLINE void quantize_32x32(const __m256i *qp, __m256i *c,
     }
 }
 
-void eb_aom_highbd_quantize_b_32x32_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
+void aom_highbd_quantize_b_32x32_avx2(const TranLow *coeff_ptr, intptr_t n_coeffs,
     int skip_block, const int16_t *zbin_ptr,
     const int16_t *round_ptr,
     const int16_t *quant_ptr,
@@ -422,6 +429,7 @@ void eb_aom_highbd_quantize_b_32x32_avx2(const TranLow *coeff_ptr, intptr_t n_co
     const int16_t *scan, const int16_t *iscan) {
     (void)scan;
     const unsigned int step = 8;
+
 
     if (LIKELY(!skip_block)) {
         __m256i qp[5], coeff;

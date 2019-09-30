@@ -12,7 +12,7 @@
 Assumes data is aligned to 4 bytes. If not aligned  then all bitstream
 accesses will be unaligned and hence  costlier. Since this is codec memory that
 holds emulation prevented data, assumption of aligned to 4 bytes is valid */
-void dec_bits_init(bitstrm_t *bs, const uint8_t *data, size_t numbytes) {
+void dec_bits_init(bitstrm_t *bs, const uint8_t *data, uint32_t u4_numbytes) {
     uint32_t cur_word;
     uint32_t nxt_word;
     uint32_t temp;
@@ -27,7 +27,7 @@ void dec_bits_init(bitstrm_t *bs, const uint8_t *data, size_t numbytes) {
     bs->buf = buf;
     bs->cur_word = cur_word;
     bs->nxt_word = nxt_word;
-    bs->buf_max = (uint8_t *)data + numbytes + 8;
+    bs->buf_max = (uint8_t *)data + u4_numbytes + 8;
     return;
 }
 
@@ -46,7 +46,7 @@ uint32_t dec_get_bits(bitstrm_t *bs, uint32_t numbits) {
 
 /* Get unsigned integer represented by a variable number of little-endian bytes */
 void dec_get_bits_leb128(bitstrm_t *bs, size_t available, size_t *value,
-    size_t *length)
+    size_t *length) 
 {
     (void)available;
     *value = 0;
@@ -58,8 +58,9 @@ void dec_get_bits_leb128(bitstrm_t *bs, size_t available, size_t *value,
         leb128_byte = dec_get_bits(bs, 8);
         *value |= (((uint64_t)leb128_byte & 0x7f) << (i * 7));
         *length += 1;
-        if (!(leb128_byte & 0x80))
+        if (!(leb128_byte & 0x80)) {
             break;
+        }
     }
 }
 
@@ -105,14 +106,15 @@ uint32_t dec_get_bits_le(bitstrm_t *bs, uint32_t n) {
 }
 
 uint32_t get_position(bitstrm_t *bs) {
-    return (uint32_t)( (( ((uint8_t *)bs->buf) - bs->buf_base) * 8) - WORD_SIZE/*nxt_word*/
+    return (uint32_t)( (( ((uint8_t *)bs->buf) - bs->buf_base) * 8) - WORD_SIZE/*nxt_word*/ 
             - (WORD_SIZE - bs->bit_ofst)/*cur_word*/ );
 }
 
 uint8_t * get_bitsteam_buf(bitstrm_t *bs) {
+
     uint8_t *bitsteam_buf = (uint8_t *)bs->buf;
     bitsteam_buf -= ((WORD_SIZE/*nxt_word*/ >> 3) + ((WORD_SIZE - bs->bit_ofst)/*cur_word*/ >> 3));
-
+    
     assert(bitsteam_buf == (bs->buf_base + (get_position(bs) >> 3) ) );
 
     return bitsteam_buf;

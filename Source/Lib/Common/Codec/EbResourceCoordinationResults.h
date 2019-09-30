@@ -8,7 +8,6 @@
 
 #include "EbDefinitions.h"
 #include "EbSystemResourceManager.h"
-#include "EbObject.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,7 +15,6 @@ extern "C" {
      * Process Results
      **************************************/
     typedef struct ResourceCoordinationResults {
-        EbDctor         dctor;
         EbObjectWrapper *picture_control_set_wrapper_ptr;
     } ResourceCoordinationResults;
 
@@ -27,9 +25,10 @@ extern "C" {
     /**************************************
      * Extern Function Declarations
      **************************************/
-    extern EbErrorType resource_coordination_result_creator(
+    extern EbErrorType resource_coordination_result_ctor(
         EbPtr *object_dbl_ptr,
         EbPtr  object_init_data_ptr);
+
 
 #ifdef __cplusplus
 }

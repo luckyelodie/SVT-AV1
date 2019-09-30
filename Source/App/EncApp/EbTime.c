@@ -33,6 +33,7 @@ __attribute__((optimize("unroll-loops")))
 #endif
 
 void StartTime(uint64_t *Startseconds, uint64_t *Startuseconds) {
+
 #if defined(__linux__) || defined(__APPLE__) //(LINUX_ENCODER_TIMING || LINUX_DECODER_TIMING)
     struct timeval start;
     gettimeofday(&start, NULL);
@@ -45,9 +46,11 @@ void StartTime(uint64_t *Startseconds, uint64_t *Startuseconds) {
     (void)(*Startuseconds);
     (void)(*Startseconds);
 #endif
+
 }
 
 void FinishTime(uint64_t *Finishseconds, uint64_t *Finishuseconds) {
+
 #if defined(__linux__) || defined(__APPLE__) //(LINUX_ENCODER_TIMING || LINUX_DECODER_TIMING)
     struct timeval finish;
     gettimeofday(&finish, NULL);
@@ -60,6 +63,7 @@ void FinishTime(uint64_t *Finishseconds, uint64_t *Finishuseconds) {
     (void)(*Finishuseconds);
     (void)(*Finishseconds);
 #endif
+
 }
 
 void ComputeOverallElapsedTime(uint64_t Startseconds, uint64_t Startuseconds, uint64_t Finishseconds, uint64_t Finishuseconds, double *duration)
@@ -84,6 +88,7 @@ void ComputeOverallElapsedTime(uint64_t Startseconds, uint64_t Startuseconds, ui
     (void)(Finishseconds);
 
 #endif
+
 }
 
 void ComputeOverallElapsedTimeMs(uint64_t Startseconds, uint64_t Startuseconds, uint64_t Finishseconds, uint64_t Finishuseconds, double *duration)
@@ -108,6 +113,7 @@ void ComputeOverallElapsedTimeMs(uint64_t Startseconds, uint64_t Startuseconds, 
     (void)(Finishseconds);
 
 #endif
+
 }
 
 static void SleepMs(uint64_t milliSeconds)
@@ -163,6 +169,7 @@ void Injector(uint64_t processed_frame_count,
     }
     else
     {
+
 #if defined(__linux__) || defined(__APPLE__)
         FinishTime((uint64_t*)&currentTimesSeconds, (uint64_t*)&currentTimesuSeconds);
         ComputeOverallElapsedTime(startTimesSeconds, startTimesuSeconds, currentTimesSeconds, currentTimesuSeconds, &elapsedTime);

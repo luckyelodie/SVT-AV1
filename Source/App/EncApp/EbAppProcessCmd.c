@@ -9,13 +9,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
+
 #include "EbAppContext.h"
 #include "EbAppConfig.h"
 #include "EbSvtAv1ErrorCodes.h"
 #include "EbAppInputy4m.h"
 
 #include "EbTime.h"
+
 
 #define IVF_FRAME_HEADER_IN_LIB                     0
 
@@ -36,7 +37,9 @@ void LogErrorOutput(
     FILE                     *error_log_file,
     uint32_t                  error_code)
 {
+
     switch (error_code) {
+
         // EB_ENC_AMVP_ERRORS:
     case EB_ENC_AMVP_ERROR1:
         fprintf(error_log_file, "Error: The input PU to GetNonScalingSpatialAMVP() can not be I_MODE!\n");
@@ -114,6 +117,7 @@ void LogErrorOutput(
         fprintf(error_log_file, "Error: Invalid Prediction Mode\n");
         break;
 
+
         // EB_ENC_DLF_ERRORS:
     case EB_ENC_DLF_ERROR1:
         fprintf(error_log_file, "Error: While calculating bS for DLF!\n");
@@ -154,6 +158,8 @@ void LogErrorOutput(
     case EB_ENC_DLF_ERROR10:
         fprintf(error_log_file, "Error: Deblocking filter can not support the picture whose width or height is not the multiple of 8!");
         break;
+
+
 
         // EB_ENC_EC_ERRORS:
     case EB_ENC_EC_ERROR1:
@@ -343,6 +349,7 @@ void LogErrorOutput(
     case EB_ENC_INVLD_PART_SIZE_ERROR:
         fprintf(error_log_file, "Error: IntraPrediction: only PU sizes of 8 or largers are currently supported!\n");
         break;
+
 
         // EB_ENC_MD_ERRORS:
     case EB_ENC_MD_ERROR1:
@@ -613,6 +620,7 @@ void LogErrorOutput(
     Output  : valid input buffer
 ******************************************************/
 void ProcessInputFieldStandardMode(
+
     EbConfig               *config,
     EbBufferHeaderType      *headerPtr,
     FILE                     *input_file,
@@ -620,6 +628,7 @@ void ProcessInputFieldStandardMode(
     uint8_t                    *cbInputPtr,
     uint8_t                    *crInputPtr,
     uint8_t                   is16bit) {
+
     const int64_t input_padded_width  = config->input_padded_width;
     const int64_t input_padded_height = config->input_padded_height;
     const uint8_t color_format = config->encoder_color_format;
@@ -637,6 +646,7 @@ void ProcessInputFieldStandardMode(
         fseeko64(input_file, (long)source_luma_row_size, SEEK_CUR);
 
     for (inputRowIndex = 0; inputRowIndex < input_padded_height; inputRowIndex++) {
+
         headerPtr->n_filled_len += (uint32_t)fread(ebInputPtr, 1, source_luma_row_size, input_file);
         // Skip 1 luma row (only fields)
         fseeko64(input_file, (long)source_luma_row_size, SEEK_CUR);
@@ -663,6 +673,7 @@ void ProcessInputFieldStandardMode(
     // Step back 1 chroma row if bottom field (undo the previous jump), and skip 1 chroma row if bottom field (point to the bottom field)
     // => no action
 
+
     for (inputRowIndex = 0; inputRowIndex < input_padded_height >> subsampling_y; inputRowIndex++) {
         headerPtr->n_filled_len += (uint32_t)fread(ebInputPtr, 1, source_chroma_row_size, input_file);
         // Skip 1 chroma row (only fields)
@@ -671,9 +682,11 @@ void ProcessInputFieldStandardMode(
     }
 
     // Step back 1 chroma row if bottom field (undo the previous jump)
-    if (config->processed_frame_count % 2 != 0)
+    if (config->processed_frame_count % 2 != 0) {
         fseeko64(input_file, -(long)source_chroma_row_size, SEEK_CUR);
+    }
 }
+
 
 //************************************/
 // GetNextQpFromQpFile
@@ -748,6 +761,7 @@ void ReadInputFrames(
     uint8_t                      is16bit,
     EbBufferHeaderType         *headerPtr)
 {
+
     uint64_t  readSize;
     const uint32_t  input_padded_width = config->input_padded_width;
     const uint32_t  input_padded_height = config->input_padded_height;
@@ -770,6 +784,7 @@ void ReadInputFrames(
 
             // Interlaced Video
             if (config->separate_fields) {
+
                 ProcessInputFieldStandardMode(
                     config,
                     headerPtr,
@@ -780,6 +795,7 @@ void ReadInputFrames(
                     is16bit);
 
                 if (readSize != headerPtr->n_filled_len) {
+
                     fseek(input_file, 0, SEEK_SET);
                     headerPtr->n_filled_len = 0;
 
@@ -794,13 +810,17 @@ void ReadInputFrames(
                 }
 
                 // Reset the pointer position after a top field
-                if (config->processed_frame_count % 2 == 0)
+                if (config->processed_frame_count % 2 == 0) {
                     fseek(input_file, -(long)(readSize << 1), SEEK_CUR);
+                }
             }
             else {
+
                 /* if input is a y4m file, read next line which contains "FRAME" */
-                if(config->y4m_input==EB_TRUE)
+                if(config->y4m_input==EB_TRUE) {
                     read_y4m_frame_delimiter(config);
+                }
+
                 uint64_t lumaReadSize = (uint64_t)input_padded_width*input_padded_height << is16bit;
                 ebInputPtr = inputPtr->luma;
                 if(config->y4m_input==EB_FALSE && config->processed_frame_count == 0 && config->input_file == stdin) {
@@ -895,8 +915,10 @@ void ReadInputFrames(
     }
 
     // If we reached the end of file, loop over again
-    if (feof(input_file) != 0)
+    if (feof(input_file) != 0) {
         fseek(input_file, 0, SEEK_SET);
+    }
+
     return;
 }
 
@@ -923,6 +945,7 @@ void SendQpOnTheFly(
             // check if the qp read is valid
             else if (tmpQp > 0)
                 break;
+
         } while (tmpQp == 0 || ((tmpQp == -1) && (qpReadFromFile != 0)));
 
         if (tmpQp == -1) {
@@ -962,7 +985,10 @@ AppExitConditionType ProcessInputBuffer(
     compressed10bitFrameSize += compressed10bitFrameSize / 4;
 
     if (config->injector && config->processed_frame_count)
+    {
         Injector(config->processed_frame_count, config->injector_frame_rate);
+    }
+
     totalBytesToProcessCount = (frames_to_be_encoded < 0) ? -1 : (config->encoder_bit_depth == 10 && config->compressed_ten_bit_format == 1) ?
         frames_to_be_encoded * (int64_t)compressed10bitFrameSize:
         frames_to_be_encoded * SIZE_OF_ONE_FRAME_IN_BYTES(input_padded_width, input_padded_height, color_format, is16bit);
@@ -987,8 +1013,10 @@ AppExitConditionType ProcessInputBuffer(
                 config,
                 headerPtr);
 
-        if (keepRunning == 0 && !config->stop_encoder)
+        if (keepRunning == 0 && !config->stop_encoder) {
             config->stop_encoder = EB_TRUE;
+        }
+
         // Fill in Buffers Header control data
         headerPtr->pts          = config->processed_frame_count-1;
         headerPtr->pic_type    = EB_AV1_INVALID_PICTURE;
@@ -999,6 +1027,7 @@ AppExitConditionType ProcessInputBuffer(
         eb_svt_enc_send_picture(componentHandle, headerPtr);
 
         if ((config->processed_frame_count == (uint64_t)config->frames_to_be_encoded) || config->stop_encoder) {
+
             headerPtr->n_alloc_len    = 0;
             headerPtr->n_filled_len   = 0;
             headerPtr->n_tick_count   = 0;
@@ -1008,9 +1037,11 @@ AppExitConditionType ProcessInputBuffer(
             headerPtr->pic_type    = EB_AV1_INVALID_PICTURE;
 
             eb_svt_enc_send_picture(componentHandle, headerPtr);
+
         }
 
         return_value = (headerPtr->flags == EB_BUFFERFLAG_EOS) ? APP_ExitConditionFinished : return_value;
+
     }
 
     return return_value;
@@ -1033,6 +1064,7 @@ static __inline void mem_put_le32(void *vmem, int32_t val) {
     mem[3] = (uint8_t)((val >> 24) & 0xff);
 }
 #define MEM_VALUE_T_SZ_BITS (sizeof(MEM_VALUE_T) << 3)
+
 
 static __inline void mem_put_le16(void *vmem, int32_t val) {
     uint8_t *mem = (uint8_t *)vmem;
@@ -1074,6 +1106,7 @@ static void write_ivf_stream_header(EbConfig *config)
     return;
 }
 static void update_prev_ivf_header(EbConfig *config){
+
     char header[4]; // only for the number of bytes
     if (config && config->bitstream_file && config->byte_count_since_ivf != 0){
         fseeko64(config->bitstream_file, (-(int32_t)(config->byte_count_since_ivf + IVF_FRAME_HEADER_SIZE)),SEEK_CUR);
@@ -1104,64 +1137,6 @@ static void write_ivf_frame_header(EbConfig *config, uint32_t byte_count){
         fwrite(header, 1, IVF_FRAME_HEADER_SIZE, config->bitstream_file);
 }
 
-/***************************************
-* Process Output STATISTICS Buffer
-***************************************/
-void process_output_statistics_buffer(
-    EbBufferHeaderType      *header_ptr,
-    EbConfig                *config){
-
-    uint32_t    max_luma_value = (config->encoder_bit_depth == 8) ? 255 : 1023;
-    uint64_t    picture_stream_size, luma_sse, cr_sse, cb_sse, picture_number, picture_qp;
-    double      temp_var, luma_psnr, cb_psnr, cr_psnr;
-
-    picture_stream_size  = header_ptr->n_filled_len;
-    luma_sse             = header_ptr->luma_sse;
-    cr_sse               = header_ptr->cr_sse;
-    cb_sse               = header_ptr->cb_sse;
-    picture_number       = header_ptr->pts;
-    picture_qp           = header_ptr->qp;
-
-    temp_var = (double)max_luma_value*max_luma_value *
-             (config->source_width*config->source_height);
-
-    if (luma_sse == 0)
-        luma_psnr = 100;
-    else
-        luma_psnr = 10 * log10((double)temp_var / (double)luma_sse);
-
-    temp_var = (double) max_luma_value * max_luma_value *
-            (config->source_width / 2 * config->source_height / 2);
-
-    if (cb_sse == 0)
-        cb_psnr = 100;
-    else
-        cb_psnr = 10 * log10((double)temp_var / (double)cb_sse);
-
-    if (cr_sse == 0)
-        cr_psnr = 100;
-    else
-        cr_psnr = 10 * log10((double)temp_var / (double)cr_sse);
-
-    config->performance_context.sum_luma_psnr += luma_psnr;
-    config->performance_context.sum_cr_psnr   += cr_psnr;
-    config->performance_context.sum_cb_psnr   += cb_psnr;
-    config->performance_context.sum_qp        += picture_qp;
-
-    // Write statistic Data to file
-    if (config->stat_file)
-        fprintf(config->stat_file, "Picture Number: %4d\t QP: %4d [Y: %.2f dB, U: %.2f dB, V: %.2f dB]\t %6d bits\n",
-        (int)picture_number,
-        (int)picture_qp,
-        luma_psnr,
-        cr_psnr,
-        cb_psnr,
-        (int)picture_stream_size);
-
-    return;
-}
-
-
 AppExitConditionType ProcessOutputStreamBuffer(
     EbConfig             *config,
     EbAppContext         *appCallBack,
@@ -1184,9 +1159,11 @@ AppExitConditionType ProcessOutputStreamBuffer(
     // Local variables
     uint64_t                finishsTime     = 0;
     uint64_t                finishuTime     = 0;
+#if ALT_REF_OVERLAY_APP
     uint8_t is_alt_ref = 1;
     while (is_alt_ref) {
         is_alt_ref = 0;
+#endif
         // non-blocking call until all input frames are sent
         stream_status = eb_svt_get_packet(componentHandle, &headerPtr, pic_send_done);
 
@@ -1198,18 +1175,22 @@ AppExitConditionType ProcessOutputStreamBuffer(
             return APP_ExitConditionError;
         }
         else if (stream_status != EB_NoErrorEmptyQueue) {
+#if ALT_REF_OVERLAY_APP
             is_alt_ref = (headerPtr->flags & EB_BUFFERFLAG_IS_ALT_REF);
+#endif
             EbBool   has_tiles = (EbBool)(appCallBack->eb_enc_parameters.tile_columns || appCallBack->eb_enc_parameters.tile_rows);
             uint8_t  obu_frame_header_size = has_tiles ? OBU_FRAME_HEADER_SIZE + 1 : OBU_FRAME_HEADER_SIZE;
+#if ALT_REF_OVERLAY_APP
             if (!(headerPtr->flags & EB_BUFFERFLAG_IS_ALT_REF))
+#endif
                 ++(config->performance_context.frame_count);
             *total_latency += (uint64_t)headerPtr->n_tick_count;
             *max_latency = (headerPtr->n_tick_count > *max_latency) ? headerPtr->n_tick_count : *max_latency;
 
-            FinishTime((uint64_t*)&finishsTime, (uint64_t*)&finishuTime);
+            EbFinishTime((uint64_t*)&finishsTime, (uint64_t*)&finishuTime);
 
             // total execution time, inc init time
-            ComputeOverallElapsedTime(
+            EbComputeOverallElapsedTime(
                 config->performance_context.lib_start_time[0],
                 config->performance_context.lib_start_time[1],
                 finishsTime,
@@ -1217,7 +1198,7 @@ AppExitConditionType ProcessOutputStreamBuffer(
                 &config->performance_context.total_execution_time);
 
             // total encode time
-            ComputeOverallElapsedTime(
+            EbComputeOverallElapsedTime(
                 config->performance_context.encode_start_time[0],
                 config->performance_context.encode_start_time[1],
                 finishsTime,
@@ -1226,7 +1207,11 @@ AppExitConditionType ProcessOutputStreamBuffer(
 
             // Write Stream Data to file
             if (streamFile) {
+#if ALT_REF_OVERLAY_APP
                 if (config->performance_context.frame_count ==  1 && !(headerPtr->flags & EB_BUFFERFLAG_IS_ALT_REF)){
+#else
+                if (config->performance_context.frame_count == 1) {
+#endif
                     write_ivf_stream_header(config);
                 }
 
@@ -1243,6 +1228,7 @@ AppExitConditionType ProcessOutputStreamBuffer(
                     // An EB_BUFFERFLAG_SHOW_EXT means that another TD has been added to the packet to show another frame, a new IVF is needed
                     write_ivf_frame_header(config, (obu_frame_header_size + TD_SIZE));
                     fwrite(headerPtr->p_buffer + headerPtr->n_filled_len - (obu_frame_header_size + TD_SIZE), 1, (obu_frame_header_size + TD_SIZE), streamFile);
+
 
                     break;
 
@@ -1285,9 +1271,6 @@ AppExitConditionType ProcessOutputStreamBuffer(
             }
             config->performance_context.byte_count += headerPtr->n_filled_len;
 
-            if (config->stat_report && !(headerPtr->flags & EB_BUFFERFLAG_IS_ALT_REF))
-                process_output_statistics_buffer(headerPtr, config);
-
             // Update Output Port Activity State
             *portState = (headerPtr->flags & EB_BUFFERFLAG_EOS) ? APP_PortInactive : *portState;
             return_value = (headerPtr->flags & EB_BUFFERFLAG_EOS) ? APP_ExitConditionFinished : APP_ExitConditionNone;
@@ -1299,7 +1282,9 @@ AppExitConditionType ProcessOutputStreamBuffer(
             ++frame_count;
 #else
             //++frame_count;
+#if ALT_REF_OVERLAY_APP
             if (!(headerPtr->flags & EB_BUFFERFLAG_IS_ALT_REF))
+#endif
                 printf("\b\b\b\b\b\b\b\b\b%9d", ++frame_count);
 #endif
 
@@ -1318,7 +1303,9 @@ AppExitConditionType ProcessOutputStreamBuffer(
                 }
             }
         }
-    }
+#if ALT_REF_OVERLAY_APP
+    } 
+#endif
     return return_value;
 }
 AppExitConditionType ProcessOutputReconBuffer(
@@ -1361,3 +1348,4 @@ AppExitConditionType ProcessOutputReconBuffer(
     }
     return return_value;
 }
+

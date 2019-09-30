@@ -22,5 +22,6 @@ typedef struct
 
     EbBool                               in_progress;
     uint32_t                                current_row_idx;
+
 } MdSegments_t;
 #endif // EbModeDecisionSegments_h

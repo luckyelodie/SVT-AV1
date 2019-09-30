@@ -584,3 +584,4 @@ extern void intra_mode_angular_horizontal_kernel_ssse3_intrin(
         }
     }
 }
+

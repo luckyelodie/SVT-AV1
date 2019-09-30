@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 
+
     extern void initialize_buffer_32bits_sse2_intrin(
         uint32_t *pointer,
         uint32_t  count128,
@@ -42,3 +43,4 @@ extern "C" {
 }
 #endif
 #endif // EbMeSadCalculation_asm_h
+

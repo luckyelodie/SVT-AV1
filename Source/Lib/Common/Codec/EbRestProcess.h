@@ -14,14 +14,12 @@
 #include "EbUtility.h"
 #include "EbPsnr.h"
 #include "EbPictureControlSet.h"
-#include "EbObject.h"
 
 /**************************************
  * Rest Context
  **************************************/
 typedef struct RestContext
 {
-    EbDctor                       dctor;
     EbFifo                       *rest_input_fifo_ptr;
     EbFifo                       *rest_output_fifo_ptr;
     EbFifo                       *picture_demux_fifo_ptr;
@@ -36,13 +34,15 @@ typedef struct RestContext
                                                     // each thread will hence have his own copy of recon to work on.
                                                     // later we can have a search version that does not need the exact right recon
     int32_t *rst_tmpbuf;
+
+
 } RestContext;
 
 /**************************************
  * Extern Function Declarations
  **************************************/
 extern EbErrorType rest_context_ctor(
-    RestContext                  *context_ptr,
+    RestContext **context_dbl_ptr,
     EbFifo                       *rest_input_fifo_ptr,
     EbFifo                       *rest_output_fifo_ptr,
     EbFifo                      *picture_demux_fifo_ptr,

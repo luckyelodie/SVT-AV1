@@ -30,7 +30,7 @@ static INLINE __m256i load_line2_avx2(const void *a, const void *b) {
         _mm256_castsi128_si256(_mm_loadu_si128((__m128i *)b)), 0x20);
 }
 
-void eb_av1_jnt_convolve_x_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
+void av1_jnt_convolve_x_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
     int32_t dst_stride0, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,
@@ -125,7 +125,7 @@ void eb_av1_jnt_convolve_x_avx2(const uint8_t *src, int32_t src_stride, uint8_t 
     }
 }
 
-void eb_av1_jnt_convolve_y_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
+void av1_jnt_convolve_y_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
     int32_t dst_stride0, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,
@@ -312,6 +312,7 @@ void eb_av1_jnt_convolve_y_avx2(const uint8_t *src, int32_t src_stride, uint8_t 
                     _mm_storeu_si128((__m128i *)(&dst0[i * dst_stride0 + j]), res_0);
                     _mm_storeu_si128(
                         (__m128i *)((&dst0[i * dst_stride0 + j + dst_stride0])), res_1);
+
                 }
                 else {
                     const __m128i res_lo_0 = _mm256_castsi256_si128(res_lo_unsigned);
@@ -340,7 +341,7 @@ void eb_av1_jnt_convolve_y_avx2(const uint8_t *src, int32_t src_stride, uint8_t 
     }
 }
 
-void eb_av1_jnt_convolve_2d_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
+void av1_jnt_convolve_2d_avx2(const uint8_t *src, int32_t src_stride, uint8_t *dst0,
     int32_t dst_stride0, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,
@@ -500,6 +501,7 @@ void eb_av1_jnt_convolve_2d_avx2(const uint8_t *src, int32_t src_stride, uint8_t
                             _mm_cvtsi128_si32(res_0);
                         *(uint32_t *)(&dst0[i * dst_stride0 + j + dst_stride0]) =
                             _mm_cvtsi128_si32(res_1);
+
                     }
                     else {
                         const __m128i res_0 = _mm256_castsi256_si128(res_unsigned);
@@ -523,7 +525,7 @@ void eb_av1_jnt_convolve_2d_avx2(const uint8_t *src, int32_t src_stride, uint8_t
     }
 }
 
-void eb_av1_jnt_convolve_2d_copy_avx2(const uint8_t *src, int32_t src_stride,
+void av1_jnt_convolve_2d_copy_avx2(const uint8_t *src, int32_t src_stride,
     uint8_t *dst0, int32_t dst_stride0, int32_t w, int32_t h,
     InterpFilterParams *filter_params_x,
     InterpFilterParams *filter_params_y,

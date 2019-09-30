@@ -10,6 +10,7 @@
 #include "EbDefinitions.h"
 #include "aom_dsp_rtcd.h"
 
+
 static INLINE __m128i dc_sum_4x32bit(const __m128i src) {
     __m128i sum, sum_hi;
     sum_hi = _mm_srli_si128(src, 8);
@@ -55,5 +56,6 @@ static INLINE __m128i dc_sum_8(const uint16_t *const src) {
     const __m128i s = _mm_load_si128((const __m128i *)src);
     return dc_sum_8x16bit(s);
 }
+
 
 #endif // EbHighbdIntraPrediction_SSE2_h

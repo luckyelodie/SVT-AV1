@@ -8,7 +8,6 @@
 
 #include "EbDefinitions.h"
 #include "EbSystemResourceManager.h"
-#include "EbObject.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,8 +15,8 @@ extern "C" {
      * Process Results
      **************************************/
     typedef struct EntropyCodingResults {
-        EbDctor              dctor;
         EbObjectWrapper      *picture_control_set_wrapper_ptr;
+
     } EntropyCodingResults;
 
     typedef struct EntropyCodingResultsInitData {
@@ -27,9 +26,10 @@ extern "C" {
     /**************************************
      * Extern Function Declarations
      **************************************/
-    extern EbErrorType entropy_coding_results_creator(
+    extern EbErrorType entropy_coding_results_ctor(
         EbPtr *object_dbl_ptr,
         EbPtr object_init_data_ptr);
+
 
 #ifdef __cplusplus
 }

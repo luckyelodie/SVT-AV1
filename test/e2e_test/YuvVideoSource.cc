@@ -80,10 +80,7 @@ EbErrorType YuvVideoSource::parse_file_info() {
 EbErrorType YuvVideoSource::seek_to_frame(const uint32_t index) {
     if (file_handle_ == nullptr)
         return EB_ErrorBadParameter;
-    uint32_t real_index = init_pos_ + index;
-    if (real_index >= file_frames_)
-        real_index = real_index % file_frames_;
-    if (fseek(file_handle_, real_index * frame_length_, SEEK_SET) != 0)
+    if (fseek(file_handle_, (init_pos_ + index) * frame_length_, SEEK_SET) != 0)
         return EB_ErrorInsufficientResources;
     return EB_ErrorNone;
 }

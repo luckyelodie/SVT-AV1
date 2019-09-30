@@ -13,6 +13,7 @@
 extern "C" {
 #endif
 
+
     /*******************************************
     * noise_extract_luma_weak
     *  weak filter Luma and store noise.
@@ -86,3 +87,4 @@ extern "C" {
 }
 #endif
 #endif // EbNoiseExtractAVX2_h
+
