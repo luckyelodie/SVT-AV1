@@ -11,33 +11,37 @@
  * @author Cidana-Ryan
  *
  ******************************************************************************/
+#include <stdio.h>
+#include "EbDefinitions.h"
 #include "VideoSource.h"
-#include "stdio.h"
+#include "random.h"
+
 using namespace svt_av1_video_source;
 VideoSource::VideoSource(const VideoColorFormat format, const uint32_t width,
                          const uint32_t height, const uint8_t bit_depth,
                          const bool use_compressed_2bit_plane_output)
     : width_(width),
-      width_with_padding_(width),
       height_(height),
+      width_with_padding_(width),
       height_with_padding_(height),
       bit_depth_(bit_depth),
+      init_pos_(0),
+      frame_count_(0),
       current_frame_index_(-1),
       frame_size_(0),
       frame_buffer_(nullptr),
-      image_format_(format),
-      svt_compressed_2bit_plane_(false),
-      frame_count_(0),
-      init_pos_(0) {
+      image_format_(format) {
     if (bit_depth_ > 8 && use_compressed_2bit_plane_output)
         svt_compressed_2bit_plane_ = true;
     else
         svt_compressed_2bit_plane_ = false;
-};  // namespace
+    frame_qp_list_.clear();
+}
 
 VideoSource::~VideoSource() {
     deinit_frame_buffer();
-};
+}
+
 bool VideoSource::is_10bit_mode() {
     if (image_format_ == IMG_FMT_420P10_PACKED ||
         image_format_ == IMG_FMT_422P10_PACKED ||
@@ -189,7 +193,7 @@ VideoFileSource::VideoFileSource(const std::string &file_name,
 VideoFileSource::~VideoFileSource() {
 }
 /**
- * @brief      Use this funcion to get vector path defined by envrionment
+ * @brief      Use this function to get vector path defined by envrionment
  * variable SVT_AV1_TEST_VECTOR_PATH, or it will return a default path.
  *
  * @return     The vectors path.
@@ -344,12 +348,11 @@ uint32_t VideoFileSource::read_input_frame() {
         uint8_t *eb_input_ptr = nullptr;
         uint8_t *eb_ext_input_ptr = nullptr;
         // Y
-        uint32_t j = 0;
         uint16_t pix = 0;
         eb_input_ptr = frame_buffer_->luma;
         eb_ext_input_ptr = frame_buffer_->luma_ext;
         for (i = 0; i < height_; ++i) {
-            int j = 0;
+            uint32_t j = 0;
             for (j = 0; j < width_; ++j) {
                 // Get one pixel
                 if (2 != fread(&pix, 1, 2, file_handle_)) {
@@ -378,7 +381,7 @@ uint32_t VideoFileSource::read_input_frame() {
         eb_input_ptr = frame_buffer_->cb;
         eb_ext_input_ptr = frame_buffer_->cb_ext;
         for (i = 0; i < (height_ >> height_downsize); ++i) {
-            int j = 0;
+            uint32_t j = 0;
             for (j = 0; j < (width_ >> width_downsize); ++j) {
                 // Get one pixel
                 if (2 != fread(&pix, 1, 2, file_handle_)) {
@@ -410,7 +413,7 @@ uint32_t VideoFileSource::read_input_frame() {
         eb_input_ptr = frame_buffer_->cr;
         eb_ext_input_ptr = frame_buffer_->cr_ext;
         for (i = 0; i < (height_ >> height_downsize); ++i) {
-            int j = 0;
+            uint32_t j = 0;
             for (j = 0; j < (width_ >> width_downsize); ++j) {
                 // Get one pixel
                 if (2 != fread(&pix, 1, 2, file_handle_)) {
@@ -450,7 +453,7 @@ EbErrorType VideoFileSource::open_source(const uint32_t init_pos,
         return EB_ErrorNone;
     std::string full_path = get_vector_dir() + "/" + file_name_.c_str();
 
-    file_handle_ = fopen(full_path.c_str(), "rb");
+    FOPEN(file_handle_, full_path.c_str(), "rb");
     if (file_handle_ == nullptr) {
         printf(">>> Open video source %s failed!\r\n", full_path.c_str());
         printf(
@@ -480,23 +483,22 @@ EbErrorType VideoFileSource::open_source(const uint32_t init_pos,
         file_handle_ = nullptr;
         return EB_ErrorInsufficientResources;
     }
-    if (file_frames_ <= init_pos || init_pos + frame_count >= file_frames_) {
-        printf(
-            "setup of initial position(%u) and output frame count(%u) is out "
-            "of bound!\n",
-            init_pos,
-            frame_count);
-        fclose(file_handle_);
-        file_handle_ = nullptr;
-        return EB_ErrorInsufficientResources;
-    }
-    init_pos_ = init_pos;
+    if (init_pos_ < file_frames_)
+        init_pos_ = init_pos;
+    else
+        init_pos_ = init_pos_ % file_frames_;
     if (frame_count == 0)
         frame_count_ = file_frames_ - init_pos_;
     else
-        frame_count_ = (file_frames_ - init_pos_) > frame_count
-                           ? frame_count
-                           : (file_frames_ - init_pos_);
+        frame_count_ = frame_count;
+
+    // generate frame qp from random if failed from file
+    if (true /* TODO: first from qp file */) {
+        svt_av1_test_tool::SVTRandom rnd(1, 63);
+        for (uint32_t i = 0; i < frame_count_; i++) {
+            frame_qp_list_.push_back(rnd.random());
+        }
+    }
 
     if (seek_to_frame(init_pos_) != EB_ErrorNone) {
         fclose(file_handle_);
@@ -561,6 +563,16 @@ EbSvtIOFormat *VideoFileSource::get_frame_by_index(const uint32_t index) {
 
 EbSvtIOFormat *VideoFileSource::get_next_frame() {
     // printf("Get Next Frame:%d\r\n", current_frame_index_ + 1);
+    if ((uint32_t)(current_frame_index_ + 1) >= frame_count_) {
+        return nullptr;
+    }
+    if (init_pos_ + (current_frame_index_ + 1) >= file_frames_ &&
+        current_frame_index_ != -1) {
+        // Seek to frame by index
+        if (seek_to_frame(current_frame_index_ + 1) != EB_ErrorNone)
+            return nullptr;
+    }
+
     frame_size_ = read_input_frame();
     if (frame_size_ == 0)
         return nullptr;
