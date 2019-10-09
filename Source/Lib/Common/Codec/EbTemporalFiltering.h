@@ -27,11 +27,8 @@
 #include "EbDefinitions.h"
 #include "EbBitstreamUnit.h"
 
-#define ALTREF_MAX_NFRAMES 10
-
 // ALT-REF debug-specific defines
 #define DEBUG_TF 0
-#define LIBAOM_FILTERING 0
 #define AV1_MC 1
 
 #define COLOR_CHANNELS 3
@@ -64,8 +61,10 @@
 #define THRES_DIFF_HIGH 12000
 
 #define OD_DIVU_DMAX (1024)
-
+#if ALTREF_TF_ADAPTIVE_WINDOW_SIZE
+#define AHD_TH_WEIGHT 50
+#endif
 void init_temporal_filtering(PictureParentControlSet **list_picture_control_set_ptr,
     PictureParentControlSet *picture_control_set_ptr_central,
-	MotionEstimationContext_t *me_context_ptr,
-	int32_t segment_index);
+    MotionEstimationContext_t *me_context_ptr,
+    int32_t segment_index);

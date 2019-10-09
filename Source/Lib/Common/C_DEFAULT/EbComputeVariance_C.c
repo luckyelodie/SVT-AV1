@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 
-
 static void variance_c(const uint8_t *a, int a_stride, const uint8_t *b,
     int b_stride, int w, int h, uint32_t *sse, int *sum) {
     int i, j;
@@ -26,7 +25,7 @@ static void variance_c(const uint8_t *a, int a_stride, const uint8_t *b,
 }
 
 #define VAR(W, H)                                                    \
-  uint32_t aom_variance##W##x##H##_c(const uint8_t *a, int a_stride, \
+  uint32_t eb_aom_variance##W##x##H##_c(const uint8_t *a, int a_stride, \
                                      const uint8_t *b, int b_stride, \
                                      uint32_t *sse) {                \
     int sum;                                                         \
@@ -56,5 +55,3 @@ VAR(64, 64)
 VAR(64, 128)
 VAR(128, 64)
 VAR(128, 128)
-
-

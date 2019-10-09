@@ -16,6 +16,7 @@
 #include "EbAdaptiveMotionVectorPrediction.h"
 #include "EbPictureOperators.h"
 #include "EbNeighborArrays.h"
+#include "EbObject.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -97,9 +98,6 @@ extern "C" {
         int32_t                                angle_delta[PLANE_TYPES];
         EbBool                                 is_directional_mode_flag;
         EbBool                                 is_directional_chroma_mode_flag;
-#if !SEARCH_UV_CLEAN_UP
-        EbBool                                 use_angle_delta;
-#endif
         uint32_t                               intra_chroma_mode; // AV1 mode, no need to convert
 
         // Index of the alpha Cb and alpha Cr combination
@@ -113,25 +111,15 @@ extern "C" {
         uint32_t                               pred_mv_weight;
         uint8_t                                ref_frame_type;
         uint8_t                                ref_mv_index;
-#if MRP_MD
         int8_t                                 ref_frame_index_l0;
         int8_t                                 ref_frame_index_l1;
-#endif
         EbBool                                 is_new_mv;
         EbBool                                 is_zero_mv;
-#if ATB_TX_TYPE_SUPPORT_PER_TU
         TxType                                 transform_type[MAX_TXB_COUNT];
         TxType                                 transform_type_uv;
-#else
-        TxType                                 transform_type[PLANE_TYPES];
-#endif
         MacroblockPlane                        candidate_plane[MAX_MB_PLANE];
         uint16_t                               eob[MAX_MB_PLANE][MAX_TXB_COUNT];
-#if ATB_DC_CONTEXT_SUPPORT_1
         int32_t                                quantized_dc[3][MAX_TXB_COUNT];
-#else
-        int32_t                                quantized_dc[3];
-#endif
         uint32_t                               interp_filters;
         uint8_t                                tu_width;
         uint8_t                                tu_height;
@@ -139,11 +127,8 @@ extern "C" {
         uint16_t                               num_proj_ref;
         EbBool                                 local_warp_valid;
         EbWarpedMotionParams                   wm_params;
-#if ATB_SUPPORT
         uint8_t                                tx_depth;
-#endif
     } ModeDecisionCandidate;
-
 
     /**************************************
     * Function Ptrs Definitions
@@ -166,9 +151,7 @@ extern "C" {
         const BlockGeom                        *blk_geom,
         uint32_t                                miRow,
         uint32_t                                miCol,
-#if MRP_COST_EST
         uint8_t                                 md_pass,
-#endif
         uint32_t                                left_neighbor_mode,
         uint32_t                                top_neighbor_mode);
 
@@ -216,7 +199,7 @@ extern "C" {
     /**************************************
     * Mode Decision Candidate Buffer
     **************************************/
-    typedef struct IntraChromaCandidateBuffer 
+    typedef struct IntraChromaCandidateBuffer
     {
         uint32_t                              mode;
         uint64_t                              cost;
@@ -228,8 +211,9 @@ extern "C" {
     /**************************************
     * Mode Decision Candidate Buffer
     **************************************/
-    typedef struct ModeDecisionCandidateBuffer 
+    typedef struct ModeDecisionCandidateBuffer
     {
+        EbDctor                              dctor;
         // Candidate Ptr
         ModeDecisionCandidate                *candidate_ptr;
 
@@ -248,27 +232,27 @@ extern "C" {
         uint64_t                                residual_luma_sad;
         uint64_t                                full_lambda_rate;
         uint64_t                                full_cost_luma;
-                                               
-        // Costs                               
+
+        // Costs
         uint64_t                               *fast_cost_ptr;
         uint64_t                               *full_cost_ptr;
         uint64_t                               *full_cost_skip_ptr;
         uint64_t                               *full_cost_merge_ptr;
-        //                                     
+        //
         uint64_t                                cb_coeff_bits;
         uint64_t                                cb_distortion[2];
         uint64_t                                cr_coeff_bits;
         uint64_t                                cr_distortion[2];
         uint64_t                                y_full_distortion[DIST_CALC_TOTAL];
         uint64_t                                y_coeff_bits;
-
     } ModeDecisionCandidateBuffer;
 
     /**************************************
     * Extern Function Declarations
     **************************************/
     extern EbErrorType mode_decision_candidate_buffer_ctor(
-        ModeDecisionCandidateBuffer **buffer_dbl_ptr,
+        ModeDecisionCandidateBuffer    *buffer_ptr,
+        EbBitDepthEnum                  max_bitdepth,
         uint64_t                       *fast_cost_ptr,
         uint64_t                       *full_cost_ptr,
         uint64_t                       *full_cost_skip_ptr,
@@ -318,7 +302,6 @@ extern "C" {
         uint64_t                               *cr_coeff_bits,
         uint32_t                                transform_size);
     struct CodingLoopContext_s;
-#if MRP_LIST_REF_IDX_TYPE_LT
     /*
       |-------------------------------------------------------------|
       | ref_idx          0            1           2            3       |
@@ -327,16 +310,9 @@ extern "C" {
       |-------------------------------------------------------------|
     */
 #define INVALID_REF 0xF
-#if  MCP_4XN_FIX 
     uint8_t get_ref_frame_idx(uint8_t ref_type);
-#else
-    extern uint8_t get_ref_frame_idx(uint8_t list, uint8_t ref_type);
-#endif
     extern MvReferenceFrame svt_get_ref_frame_type(uint8_t list, uint8_t ref_idx);
-#endif
-#if INJ_MVP
     uint8_t get_list_idx(uint8_t ref_type);
-#endif
 #ifdef __cplusplus
 }
 #endif

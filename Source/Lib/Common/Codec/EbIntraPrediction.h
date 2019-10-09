@@ -20,6 +20,7 @@
 #include "EbModeDecision.h"
 #include "EbNeighborArrays.h"
 #include "EbMotionEstimationProcess.h"
+#include "EbObject.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,9 +41,9 @@ extern "C" {
         const uint16_t *above, const uint16_t *left,
         int32_t bd);
 
-    typedef struct IntraReferenceSamples 
+    typedef struct IntraReferenceSamples
     {
-
+        EbDctor                   dctor;
         uint8_t                  *y_intra_reference_array;
         uint8_t                  *cb_intra_reference_array;
         uint8_t                  *cr_intra_reference_array;
@@ -68,12 +69,11 @@ extern "C" {
         uint8_t                   reference_left_line_cr[(MAX_PU_SIZE << 2) + 2];
         EbBool                 above_ready_flag_cr;
         EbBool                 left_ready_flag_cr;
-
     } IntraReferenceSamples;
 
-    typedef struct IntraReference16bitSamples 
+    typedef struct IntraReference16bitSamples
     {
-
+        EbDctor                    dctor;
         uint16_t                  *y_intra_reference_array;
         uint16_t                  *cb_intra_reference_array;
         uint16_t                  *cr_intra_reference_array;
@@ -99,14 +99,7 @@ extern "C" {
         uint16_t                   reference_left_line_cr[(MAX_PU_SIZE << 2) + 2];
         EbBool                  above_ready_flag_cr;
         EbBool                  left_ready_flag_cr;
-
     } IntraReference16bitSamples;
-
-    extern EbErrorType intra_reference_samples_ctor(
-        IntraReferenceSamples **context_dbl_ptr);
-
-    extern EbErrorType intra_reference16bit_samples_ctor(
-        IntraReference16bitSamples **context_dbl_ptr);
 
 #define TOTAL_LUMA_MODES                   35
 #define TOTAL_CHROMA_MODES                  5
@@ -122,11 +115,10 @@ extern "C" {
 /////####.... For recursive intra prediction.....#####///
 
 #define FILTER_INTRA_SCALE_BITS 4
-extern const int8_t av1_filter_intra_taps[FILTER_INTRA_MODES][8][8];
+extern const int8_t eb_av1_filter_intra_taps[FILTER_INTRA_MODES][8][8];
 
-
-/////####.... To make functions common between EbIntraPrediction.c & 
-void *aom_memset16(void *dest, int32_t val, size_t length);
+/////####.... To make functions common between EbIntraPrediction.c &
+void *eb_aom_memset16(void *dest, int32_t val, size_t length);
 
 int32_t use_intra_edge_upsample(int32_t bs0, int32_t bs1, int32_t delta,
                                        int32_t type);
@@ -169,6 +161,13 @@ void dr_predictor(uint8_t *dst, ptrdiff_t stride, TxSize tx_size,
 
 void filter_intra_edge_corner(uint8_t *p_above, uint8_t *p_left);
 
+void highbd_dr_predictor(uint16_t *dst, ptrdiff_t stride,
+    TxSize tx_size, const uint16_t *above,
+    const uint16_t *left, int32_t upsample_above,
+    int32_t upsample_left, int32_t angle, int32_t bd);
+
+void filter_intra_edge_corner_high(uint16_t *p_above, uint16_t *p_left);
+
 void highbd_filter_intra_predictor(uint16_t *dst, ptrdiff_t stride,
                                           TxSize tx_size,
                                           const uint16_t *above,
@@ -177,8 +176,7 @@ void highbd_filter_intra_predictor(uint16_t *dst, ptrdiff_t stride,
 
 /////////..............................................//////////////////////////
 
-
-    extern EbErrorType av1_intra_prediction_cl(
+    extern EbErrorType eb_av1_intra_prediction_cl(
         struct ModeDecisionContext           *context_ptr,
         PictureControlSet                    *picture_control_set_ptr,
         ModeDecisionCandidateBuffer           *candidate_buffer_ptr,
@@ -192,12 +190,8 @@ void highbd_filter_intra_predictor(uint16_t *dst, ptrdiff_t stride,
         const EbBool     skip,
         int32_t            intra_pred_angle);
 
-
-
     extern EbErrorType intra_open_loop_reference_samples_ctor(
-        IntraReferenceSamplesOpenLoop **context_dbl_ptr);
-    extern void IntraOpenLoopReferenceSamplesDtor(
-        IntraReferenceSamplesOpenLoop  *context_ptr);
+        IntraReferenceSamplesOpenLoop *context_ptr);
 
     extern EbErrorType update_neighbor_samples_array_open_loop(
         uint8_t                           *above_ref,
@@ -529,7 +523,7 @@ void highbd_filter_intra_predictor(uint16_t *dst, ptrdiff_t stride,
 typedef struct CflCtx {
         // Q3 reconstructed luma pixels (only Q2 is required, but Q3 is used to avoid
         // shifts)
-        int16_t recon_buf_q3[CFL_BUF_SQUARE];
+        EB_ALIGN(64) int16_t recon_buf_q3[CFL_BUF_SQUARE];
 
         // Height and width currently used in the CfL prediction buffer.
         int32_t buf_height, buf_width;
@@ -538,7 +532,6 @@ typedef struct CflCtx {
 
         // Chroma subsampling
         int32_t subsampling_x, subsampling_y;
-
 } CflCtx;
 
     extern void cfl_luma_subsampling_420_lbd_c(
@@ -549,7 +542,7 @@ typedef struct CflCtx {
         const uint16_t *input,
         int32_t input_stride, int16_t *output_q3,
         int32_t width, int32_t height);
-    extern void subtract_average_c(
+    extern void eb_subtract_average_c(
         int16_t *pred_buf_q3,
         int32_t width,
         int32_t height,
@@ -567,9 +560,7 @@ typedef struct CflCtx {
 
     //CFL_PREDICT_FN(c, lbd)
 
-
-
-    void cfl_predict_lbd_c(
+    void eb_cfl_predict_lbd_c(
         const int16_t *pred_buf_q3,
         uint8_t *pred,// AMIR ADDED
         int32_t pred_stride,
@@ -580,7 +571,7 @@ typedef struct CflCtx {
         int32_t width,
         int32_t height);
 
-    void cfl_predict_hbd_c(
+    void eb_cfl_predict_hbd_c(
         const int16_t *pred_buf_q3,
         uint16_t *pred,// AMIR ADDED
         int32_t pred_stride,
@@ -591,7 +582,6 @@ typedef struct CflCtx {
         int32_t width,
         int32_t height);
 
-
     static INLINE int32_t cfl_idx_to_alpha(int32_t alpha_idx, int32_t joint_sign,
         CflPredType pred_type) {
         const int32_t alpha_sign = (pred_type == CFL_PRED_U) ? CFL_SIGN_U(joint_sign)
@@ -601,7 +591,6 @@ typedef struct CflCtx {
             (pred_type == CFL_PRED_U) ? CFL_IDX_U(alpha_idx) : CFL_IDX_V(alpha_idx);
         return (alpha_sign == CFL_SIGN_POS) ? abs_alpha_q3 + 1 : -abs_alpha_q3 - 1;
     }
-
 
 /* Function pointers return by CfL functions */
 
@@ -637,9 +626,8 @@ cfl_subsample_hbd_fn cfl_get_luma_subsampling_444_hbd_c(TxSize tx_size);
 #define cfl_get_luma_subsampling_444_lbd cfl_get_luma_subsampling_444_lbd_c
 cfl_subsample_lbd_fn cfl_get_luma_subsampling_444_lbd_c(TxSize tx_size);
 
-
-cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
-#define get_subtract_average_fn get_subtract_average_fn_c
+cfl_subtract_average_fn eb_get_subtract_average_fn_c(TxSize tx_size);
+#define get_subtract_average_fn eb_get_subtract_average_fn_c
 
    // Allows the CFL_SUBSAMPLE function to switch types depending on the bitdepth.
 #define CFL_lbd_TYPE uint8_t *cfl_type
@@ -655,7 +643,7 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
         cfl_luma_subsampling_##sub##_##bd##_##arch(cfl_type, input_stride,    \
                                                    output_q3, width, height); \
       }
-    
+
     // Declare size-specific wrappers for all valid CfL sizes.
 #define CFL_SUBSAMPLE_FUNCTIONS(arch, sub, bd)                            \
       CFL_SUBSAMPLE(arch, sub, bd, 4, 4)                                      \
@@ -677,7 +665,7 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
         CFL_SUBSAMPLE_FUNCTION_ARRAY(arch, sub, bd)                           \
         return subfn_##sub[tx_size];                                          \
       }
-    
+
     // Declare an architecture-specific array of function pointers for size-specific
     // wrappers.
 #define CFL_SUBSAMPLE_FUNCTION_ARRAY(arch, sub, bd)                       \
@@ -702,7 +690,7 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
         NULL,                                  /* 16x64 (invalid CFL size) */ \
         NULL,                                  /* 64x16 (invalid CFL size) */ \
       };
-    
+
     // The RTCD script does not support passing in an array, so we wrap it in this
     // function.
 #define CFL_GET_SUBSAMPLE_FUNCTION(arch)  \
@@ -712,18 +700,17 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
       CFL_SUBSAMPLE_FUNCTIONS(arch, 420, hbd) \
       CFL_SUBSAMPLE_FUNCTIONS(arch, 422, hbd) \
       CFL_SUBSAMPLE_FUNCTIONS(arch, 444, hbd)
-    
+
     // Declare a size-specific wrapper for the size-generic function. The compiler
     // will inline the size generic function in here, the advantage is that the size
     // will be constant allowing for loop unrolling and other constant propagated
     // goodness.
 #define CFL_SUB_AVG_X(arch, width, height, round_offset, num_pel_log2)   \
-  void subtract_average_##width##x##height##_##arch(int16_t *buf) {      \
-    subtract_average_##arch(buf, width, height, round_offset,       \
+  void eb_subtract_average_##width##x##height##_##arch(int16_t *buf) {      \
+    eb_subtract_average_##arch(buf, width, height, round_offset,       \
                             num_pel_log2);                               \
   }
 
-    
     // Declare size-specific wrappers for all valid CfL sizes.
 #define CFL_SUB_AVG_FN(arch)                                                \
       CFL_SUB_AVG_X(arch, 4, 4, 8, 4)                                           \
@@ -740,25 +727,25 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
       CFL_SUB_AVG_X(arch, 32, 8, 128, 8)                                        \
       CFL_SUB_AVG_X(arch, 32, 16, 256, 9)                                       \
       CFL_SUB_AVG_X(arch, 32, 32, 512, 10)                                      \
-      cfl_subtract_average_fn get_subtract_average_fn_##arch(TxSize tx_size) { \
+      cfl_subtract_average_fn eb_get_subtract_average_fn_##arch(TxSize tx_size) { \
               const cfl_subtract_average_fn sub_avg[TX_SIZES_ALL] = {          \
-          subtract_average_4x4_##arch,   /* 4x4 */                              \
-          subtract_average_8x8_##arch,   /* 8x8 */                              \
-          subtract_average_16x16_##arch, /* 16x16 */                            \
-          subtract_average_32x32_##arch, /* 32x32 */                            \
+          eb_subtract_average_4x4_##arch,   /* 4x4 */                              \
+          eb_subtract_average_8x8_##arch,   /* 8x8 */                              \
+          eb_subtract_average_16x16_##arch, /* 16x16 */                            \
+          eb_subtract_average_32x32_##arch, /* 32x32 */                            \
           NULL,                          /* 64x64 (invalid CFL size) */         \
-          subtract_average_4x8_##arch,   /* 4x8 */                              \
-          subtract_average_8x4_##arch,   /* 8x4 */                              \
-          subtract_average_8x16_##arch,  /* 8x16 */                             \
-          subtract_average_16x8_##arch,  /* 16x8 */                             \
-          subtract_average_16x32_##arch, /* 16x32 */                            \
-          subtract_average_32x16_##arch, /* 32x16 */                            \
+          eb_subtract_average_4x8_##arch,   /* 4x8 */                              \
+          eb_subtract_average_8x4_##arch,   /* 8x4 */                              \
+          eb_subtract_average_8x16_##arch,  /* 8x16 */                             \
+          eb_subtract_average_16x8_##arch,  /* 16x8 */                             \
+          eb_subtract_average_16x32_##arch, /* 16x32 */                            \
+          eb_subtract_average_32x16_##arch, /* 32x16 */                            \
           NULL,                          /* 32x64 (invalid CFL size) */         \
           NULL,                          /* 64x32 (invalid CFL size) */         \
-          subtract_average_4x16_##arch,  /* 4x16 (invalid CFL size) */          \
-          subtract_average_16x4_##arch,  /* 16x4 (invalid CFL size) */          \
-          subtract_average_8x32_##arch,  /* 8x32 (invalid CFL size) */          \
-          subtract_average_32x8_##arch,  /* 32x8 (invalid CFL size) */          \
+          eb_subtract_average_4x16_##arch,  /* 4x16 (invalid CFL size) */          \
+          eb_subtract_average_16x4_##arch,  /* 16x4 (invalid CFL size) */          \
+          eb_subtract_average_8x32_##arch,  /* 8x32 (invalid CFL size) */          \
+          eb_subtract_average_32x8_##arch,  /* 32x8 (invalid CFL size) */          \
           NULL,                          /* 16x64 (invalid CFL size) */         \
           NULL,                          /* 64x16 (invalid CFL size) */         \
         };                                                                      \
@@ -767,6 +754,57 @@ cfl_subtract_average_fn get_subtract_average_fn_c(TxSize tx_size);
         return sub_avg[tx_size % TX_SIZES_ALL];                                 \
       }
 
+void eb_av1_predict_intra_block(
+    TileInfo *tile,
+    STAGE stage,
+    const BlockGeom *blk_geom,
+    const Av1Common *cm,
+    int32_t wpx,
+    int32_t hpx,
+    TxSize tx_size,
+    PredictionMode mode,
+    int32_t angle_delta,
+    int32_t use_palette,
+    FilterIntraMode filter_intra_mode,
+    uint8_t* topNeighArray,
+    uint8_t* leftNeighArray,
+    EbPictureBufferDesc *recon_buffer,
+    int32_t col_off,
+    int32_t row_off,
+    int32_t plane,
+    BlockSize bsize,
+    uint32_t tu_org_x_pict,
+    uint32_t tu_org_y_pict,
+    uint32_t bl_org_x_pict,
+    uint32_t bl_org_y_pict,
+    uint32_t bl_org_x_mb,
+    uint32_t bl_org_y_mb);
+
+void eb_av1_predict_intra_block_16bit(
+    TileInfo * tile,
+    STAGE stage,
+    const BlockGeom * blk_geom,
+    const Av1Common *cm,
+    int32_t wpx,
+    int32_t hpx,
+    TxSize tx_size,
+    PredictionMode mode,
+    int32_t angle_delta,
+    int32_t use_palette,
+    FilterIntraMode filter_intra_mode,
+    uint16_t* topNeighArray,
+    uint16_t* leftNeighArray,
+    EbPictureBufferDesc  *recon_buffer,
+    int32_t col_off,
+    int32_t row_off,
+    int32_t plane,
+    BlockSize bsize,
+    uint32_t tu_org_x_pict,
+    uint32_t tu_org_y_pict,
+    uint32_t bl_org_x_pict,
+    uint32_t bl_org_y_pict,
+    uint32_t bl_org_x_mb,
+    uint32_t bl_org_y_mb);
 
 #ifdef __cplusplus
 }

@@ -29,7 +29,6 @@ extern "C" {
         uint32_t                             lcuAddr,
         ModeDecisionContext               *context_ptr);
 
-
     extern EbErrorType AV1ProductModeDecisionLcu(
         SequenceControlSet                *sequence_control_set_ptr,
         PictureControlSet                 *picture_control_set_ptr,
@@ -39,7 +38,6 @@ extern "C" {
         uint32_t                             sb_origin_y,
         uint32_t                             lcuAddr,
         ModeDecisionContext               *context_ptr);
-
 
     extern EbErrorType in_loop_motion_estimation_sblock(
         PictureControlSet                 *picture_control_set_ptr,  // input parameter, Picture Control Set Ptr
@@ -62,8 +60,6 @@ extern "C" {
         SsMeContext                       *ss_mecontext,
         ModeDecisionContext               *context_ptr);
 
-
-
     extern EbErrorType ModeDecisionRefinementLcu(
         SequenceControlSet                *sequence_control_set_ptr,
         PictureControlSet                 *picture_control_set_ptr,
@@ -71,17 +67,8 @@ extern "C" {
         uint32_t                               sb_origin_x,
         uint32_t                               sb_origin_y,
         ModeDecisionContext               *context_ptr);
-#if !MEMORY_FOOTPRINT_OPT
-    extern EbErrorType QpmDeriveWeightsMinAndMax(
-        PictureControlSet                    *picture_control_set_ptr,
-        EncDecContext                        *context_ptr);
-#endif
     uint8_t get_skip_tx_search_flag(
-#if BYPASS_USELESS_TX_SEARCH
-        const BlockGeom         *blk_geom,
-#else
         int32_t                  sq_size,
-#endif
         uint64_t                 ref_fast_cost,
         uint64_t                 cu_cost,
         uint64_t                 weight);
@@ -93,11 +80,7 @@ extern "C" {
         uint32_t                   tbAddr,
         uint32_t                   sb_origin_x,
         uint32_t                   sb_origin_y,
-#if !MEMORY_FOOTPRINT_OPT
-        uint32_t                   sb_qp,
-#endif
         EncDecContext         *context_ptr);
-
 
 #if NO_ENCDEC
 
@@ -111,6 +94,39 @@ extern "C" {
         uint32_t                   sb_qp,
         EncDecContext         *context_ptr);
 #endif
+
+void pack2d_src(
+    uint8_t     *in8_bit_buffer,
+    uint32_t     in8_stride,
+    uint8_t     *inn_bit_buffer,
+    uint32_t     inn_stride,
+    uint16_t    *out16_bit_buffer,
+    uint32_t     out_stride,
+    uint32_t     width,
+    uint32_t     height,
+    EbAsm     asm_type);
+
+void Store16bitInputSrc(
+    EbPictureBufferDesc     *input_sample16bit_buffer,
+    PictureControlSet       *picture_control_set_ptr,
+    uint32_t                 lcuX,
+    uint32_t                 lcuY,
+    uint32_t                 lcuW,
+    uint32_t                 lcuH);
+
+void residual_kernel(
+    uint8_t   *input,
+    uint32_t   input_offset,
+    uint32_t   input_stride,
+    uint8_t   *pred,
+    uint32_t   pred_offset,
+    uint32_t   pred_stride,
+    int16_t   *residual,
+    uint32_t   residual_offset,
+    uint32_t   residual_stride,
+    EbBool     hbd,
+    uint32_t   area_width,
+    uint32_t   area_height);
 
 #ifdef __cplusplus
 }
